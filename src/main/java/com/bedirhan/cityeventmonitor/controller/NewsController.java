@@ -1,9 +1,11 @@
 package com.bedirhan.cityeventmonitor.controller;
 
 import com.bedirhan.cityeventmonitor.dto.FilterResponse;
+import com.bedirhan.cityeventmonitor.model.Coordinates;
 import com.bedirhan.cityeventmonitor.model.News;
 import com.bedirhan.cityeventmonitor.model.NewsType;
 import com.bedirhan.cityeventmonitor.repository.NewsRepository;
+import com.bedirhan.cityeventmonitor.service.GeocodingService;
 import com.bedirhan.cityeventmonitor.service.NewsService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
@@ -17,10 +19,13 @@ public class NewsController {
 
     private final NewsRepository newsRepository;
     private final NewsService newsService;
+    private final GeocodingService geocodingService;
 
-    public NewsController(NewsRepository newsRepository, NewsService newsService) {
+    public NewsController(NewsRepository newsRepository, NewsService newsService,
+                          GeocodingService geocodingService) {
         this.newsRepository = newsRepository;
         this.newsService = newsService;
+        this.geocodingService = geocodingService;
     }
 
     /**
@@ -59,11 +64,23 @@ public class NewsController {
         news.setType(request.getType());
         news.setLocationText(request.getLocationText());
         news.setDistrict(request.getDistrict());
-        news.setLatitude(request.getLatitude());
-        news.setLongitude(request.getLongitude());
         news.setSource(request.getSource());
         news.setUrl(request.getUrl());
         news.setPublishDate(request.getPublishDate());
+
+        // Geocoding: locationText varsa otomatik olarak lat/lng elde et
+        String locationText = request.getLocationText();
+        if (locationText != null && !locationText.isBlank()) {
+            Coordinates coords = geocodingService.geocode(locationText);
+            if (coords != null) {
+                news.setLatitude(coords.getLatitude());
+                news.setLongitude(coords.getLongitude());
+                news.setGeocodingFailed(false);
+            } else {
+                news.setGeocodingFailed(true);
+            }
+        }
+
         return newsRepository.save(news);
     }
 }
