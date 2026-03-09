@@ -1,13 +1,14 @@
 package com.bedirhan.cityeventmonitor.controller;
 
+import com.bedirhan.cityeventmonitor.dto.FilterResponse;
 import com.bedirhan.cityeventmonitor.model.News;
+import com.bedirhan.cityeventmonitor.model.NewsType;
 import com.bedirhan.cityeventmonitor.repository.NewsRepository;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.bedirhan.cityeventmonitor.service.NewsService;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -15,14 +16,39 @@ import java.util.List;
 public class NewsController {
 
     private final NewsRepository newsRepository;
+    private final NewsService newsService;
 
-    public NewsController(NewsRepository newsRepository) {
+    public NewsController(NewsRepository newsRepository, NewsService newsService) {
         this.newsRepository = newsRepository;
+        this.newsService = newsService;
     }
 
+    /**
+     * Filtreli listeleme endpoint'i.
+     * Tüm parametreler opsiyonel — hiçbiri verilmezse tüm haberler döner.
+     *
+     * GET /api/news?type=YANGIN&district=Kadıköy&startDate=2026-01-01T00:00:00&endDate=2026-03-01T00:00:00&search=patlama
+     */
     @GetMapping
-    public List<News> getAllNews() {
-        return newsRepository.findAll();
+    public List<News> getNews(
+            @RequestParam(required = false) NewsType type,
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(required = false) String search) {
+
+        return newsService.findFiltered(type, district, startDate, endDate, search);
+    }
+
+    /**
+     * Filtre seçenekleri endpoint'i.
+     * Frontend filtre dropdown'ları ve tarih aralığı için kullanır.
+     *
+     * GET /api/news/filters
+     */
+    @GetMapping("/filters")
+    public FilterResponse getFilters() {
+        return newsService.getFilterMetadata();
     }
 
     @PostMapping
@@ -41,4 +67,3 @@ public class NewsController {
         return newsRepository.save(news);
     }
 }
-
