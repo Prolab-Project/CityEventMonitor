@@ -39,7 +39,7 @@ class TextPreprocessorTest {
 
         String result = textPreprocessor.preprocess(raw);
 
-        assertThat(result).isEqualTo("kocaeli izmit trafik kazasi");
+        assertThat(result).isEqualTo("kocaeli izmit trafik kazası");
     }
 }
 

@@ -14,7 +14,7 @@ class LocationExtractorTest {
 
         LocationResult result = extractor.extract(text);
 
-        assertThat(result.getDistrict()).isEqualTo("Izmit");
+        assertThat(result.getDistrict()).isEqualTo("İzmit");
         assertThat(result.getLocationText()).satisfiesAnyOf(
                 lt -> assertThat(lt).contains("yahyakaptan mahallesi"),
                 lt -> assertThat(lt).contains("d-100 karayolu")

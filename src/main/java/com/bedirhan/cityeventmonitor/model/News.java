@@ -4,6 +4,8 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 @Document(collection = "news")
@@ -25,8 +27,8 @@ public class News {
 
     private boolean geocodingFailed;
 
-    private String source;
-    private String url;
+    private Set<String> sources = new HashSet<>();
+    private Set<String> urls = new HashSet<>();
 
     private LocalDateTime publishDate;
 }

@@ -24,18 +24,18 @@ public class TextPreprocessor {
         // 1) HTML taglerini kaldır
         text = Jsoup.clean(text, Safelist.none());
 
-        // 2) Yaygın reklam / alakasız pattern'leri temizle
+        // 2) Lowercase normalizasyonu (regex'lerin eşleşmesi için önce küçük harfe çevir)
+        text = text.toLowerCase();
+
+        // 3) Yaygın reklam / alakasız pattern'leri temizle
         text = removeNoisePatterns(text);
 
-        // 3) Gereksiz özel karakterleri sadeleştir
+        // 4) Gereksiz özel karakterleri sadeleştir
         // Harf, rakam, noktalama ve boşluk dışındaki karakterleri kaldır
         text = text.replaceAll("[^\\p{L}\\p{N}\\p{P}\\s]+", " ");
 
-        // 4) Fazla boşlukları tek boşluğa indir
+        // 5) Fazla boşlukları tek boşluğa indir
         text = text.replaceAll("\\s+", " ").trim();
-
-        // 5) Lowercase normalizasyonu
-        text = text.toLowerCase();
 
         return text;
     }
