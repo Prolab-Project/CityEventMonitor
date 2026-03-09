@@ -12,7 +12,7 @@ public interface NewsScraper {
      * @param days Kaç günlük haber çekileceği
      * @return Ham haber listesi
      */
-    List<RawNews> scrapeLastDays(int days);
+    List<RawNews> scrape(int days);
 
     /**
      * Haber kaynağının kısa adı (ör. "Çağdaş Kocaeli").

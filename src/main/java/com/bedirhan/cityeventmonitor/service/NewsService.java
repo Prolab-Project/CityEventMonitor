@@ -1,6 +1,8 @@
 package com.bedirhan.cityeventmonitor.service;
 
 import com.bedirhan.cityeventmonitor.dto.FilterResponse;
+import com.bedirhan.cityeventmonitor.dto.NewsResponseDto;
+import com.bedirhan.cityeventmonitor.dto.PagedResponse;
 import com.bedirhan.cityeventmonitor.model.News;
 import com.bedirhan.cityeventmonitor.model.NewsType;
 import com.bedirhan.cityeventmonitor.repository.NewsRepository;
@@ -23,23 +25,27 @@ public class NewsService {
     private final MongoTemplate mongoTemplate;
     private final DuplicateDetectionService duplicateDetectionService;
     private final GeocodingService geocodingService;
+    private final NewsMapper newsMapper;
 
     public NewsService(NewsRepository newsRepository, MongoTemplate mongoTemplate,
                        DuplicateDetectionService duplicateDetectionService,
-                       GeocodingService geocodingService) {
+                       GeocodingService geocodingService,
+                       NewsMapper newsMapper) {
         this.newsRepository = newsRepository;
         this.mongoTemplate = mongoTemplate;
         this.duplicateDetectionService = duplicateDetectionService;
         this.geocodingService = geocodingService;
+        this.newsMapper = newsMapper;
     }
 
     /**
      * Dinamik filtreleme: type, district, startDate, endDate, search (title/content içinde)
      * Gelen parametrelerden null olanlar filtreden çıkarılır.
      */
-    public List<News> findFiltered(NewsType type, String district,
-                                   LocalDateTime startDate, LocalDateTime endDate,
-                                   String search) {
+    public PagedResponse<NewsResponseDto> findFiltered(NewsType type, String district,
+                                                       LocalDateTime startDate, LocalDateTime endDate,
+                                                       String search,
+                                                       int page, int size) {
 
         Query query = new Query();
 
@@ -65,9 +71,25 @@ public class NewsService {
             ));
         }
 
-        query.with(Sort.by(Sort.Direction.DESC, "publishDate"));
+        // Toplam kayıt sayısını hesapla
+        long total = mongoTemplate.count(query, News.class);
 
-        return mongoTemplate.find(query, News.class);
+        // Sayfalama ve sıralama uygula
+        query.with(Sort.by(Sort.Direction.DESC, "publishDate"));
+        query.skip((long) page * size);
+        query.limit(size);
+
+        List<News> newsList = mongoTemplate.find(query, News.class);
+
+        PagedResponse<NewsResponseDto> response = new PagedResponse<>();
+        response.setItems(newsMapper.toDtoList(newsList));
+        response.setTotalElements(total);
+        int totalPages = (int) Math.ceil(total / (double) size);
+        response.setTotalPages(totalPages);
+        response.setPage(page);
+        response.setSize(size);
+
+        return response;
     }
 
     /**

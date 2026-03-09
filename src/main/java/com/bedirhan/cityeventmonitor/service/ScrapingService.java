@@ -4,6 +4,7 @@ import com.bedirhan.cityeventmonitor.controller.CreateNewsRequest;
 import com.bedirhan.cityeventmonitor.dto.ScrapeResultDto;
 import com.bedirhan.cityeventmonitor.model.News;
 import com.bedirhan.cityeventmonitor.model.RawNews;
+import com.bedirhan.cityeventmonitor.scraper.NewsScraper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

@@ -5,6 +5,7 @@ import com.bedirhan.cityeventmonitor.dto.ScrapeResultDto;
 import com.bedirhan.cityeventmonitor.model.News;
 import com.bedirhan.cityeventmonitor.model.NewsType;
 import com.bedirhan.cityeventmonitor.model.RawNews;
+import com.bedirhan.cityeventmonitor.scraper.NewsScraper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

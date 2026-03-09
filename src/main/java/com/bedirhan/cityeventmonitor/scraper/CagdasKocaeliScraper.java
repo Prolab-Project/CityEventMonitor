@@ -20,23 +20,28 @@ public class CagdasKocaeliScraper implements NewsScraper {
     private static final String BASE_URL = "https://www.cagdaskocaeli.com.tr";
 
     @Override
-    public List<RawNews> scrapeLastDays(int days) {
-        // Şimdilik basit bir yaklaşım: ana sayfadaki son haberleri çekiyoruz.
-        // İleride kategoriye/tarihe göre sayfaları da gezecek şekilde zenginleştirilebilir.
+    public List<RawNews> scrape(int days) {
+        // Şimdilik basit bir yaklaşım: ana sayfadaki /haber/ linklerini çekiyoruz.
+        // İleride kategoriye ve tarihe göre sayfaları da gezecek şekilde zenginleştirilebilir.
         List<RawNews> results = new ArrayList<>();
 
         try {
             Document doc = Jsoup.connect(BASE_URL).get();
 
-            // Sitedeki HTML yapısı zamanla değişebilir. Bu nedenle CSS selector'lar
-            // gerektiğinde güncellenmelidir.
-            Elements articleElements = doc.select("article, .news-list .news-item, .article-item");
+            // Sitedeki HTML yapısı zamanla değişebilir. Bu nedenle mümkün olduğunca
+            // genel ama anlamlı bir selector kullanıyoruz: /haber/ içeren tüm linkler.
+            Elements links = doc.select("a[href*=\"/haber/\"]");
 
-            for (Element el : articleElements) {
-                RawNews raw = extractFromElement(el);
+            int count = 0;
+            for (Element link : links) {
+                RawNews raw = extractFromLink(link);
                 if (raw != null) {
                     raw.setSourceName(getSourceName());
                     results.add(raw);
+                }
+                // Aşırı yüklenmemesi için ilk 50 haberi almak yeterli
+                if (++count >= 50) {
+                    break;
                 }
             }
         } catch (IOException e) {
@@ -46,28 +51,25 @@ public class CagdasKocaeliScraper implements NewsScraper {
         return results;
     }
 
-    private RawNews extractFromElement(Element el) {
-        // Başlık
-        Element titleEl = el.selectFirst("a[title], h2 a, .title a");
-        if (titleEl == null) {
-            return null;
-        }
-
-        String title = titleEl.attr("title");
-        if (title == null || title.isBlank()) {
-            title = titleEl.text();
-        }
-
-        // Link
-        String href = titleEl.attr("href");
+    private RawNews extractFromLink(Element link) {
+        // Link ve başlık
+        String href = link.attr("href");
         if (href == null || href.isBlank()) {
             return null;
         }
         String url = href.startsWith("http") ? href : BASE_URL + href;
 
-        // Özet / içerik (şimdilik kısa özet, detay sayfasına gitmiyoruz)
-        Element summaryEl = el.selectFirst("p, .summary, .spot");
-        String content = summaryEl != null ? summaryEl.text() : "";
+        String title = link.attr("title");
+        if (title == null || title.isBlank()) {
+            title = link.text();
+        }
+
+        if (title == null || title.isBlank()) {
+            return null;
+        }
+
+        // İçerik için şimdilik sadece başlığı kullanıyoruz; ileride detay sayfasına gidilebilir.
+        String content = "";
 
         RawNews raw = new RawNews();
         raw.setTitle(title);
