@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 @Service
@@ -20,10 +21,16 @@ public class NewsService {
 
     private final NewsRepository newsRepository;
     private final MongoTemplate mongoTemplate;
+    private final DuplicateDetectionService duplicateDetectionService;
+    private final GeocodingService geocodingService;
 
-    public NewsService(NewsRepository newsRepository, MongoTemplate mongoTemplate) {
+    public NewsService(NewsRepository newsRepository, MongoTemplate mongoTemplate,
+                       DuplicateDetectionService duplicateDetectionService,
+                       GeocodingService geocodingService) {
         this.newsRepository = newsRepository;
         this.mongoTemplate = mongoTemplate;
+        this.duplicateDetectionService = duplicateDetectionService;
+        this.geocodingService = geocodingService;
     }
 
     /**
@@ -95,5 +102,62 @@ public class NewsService {
         }
 
         return response;
+    }
+
+    /**
+     * Dışarıdan veya scraper üzerinden gelen ham News oluşturma isteğini zenginleştirir (geocoding) 
+     * ve duplicate kontrolünden (merge) geçirerek kaydeder.
+     * @return Kaydedilen veya güncellenen News nesnesi (Eğer kopya kaynakları birebir aynıysa opsiyonel olarak boolean isNew dönülebilir ama şimdilik sadece News yeterli).
+     */
+    public News saveAndEnrichNews(com.bedirhan.cityeventmonitor.controller.CreateNewsRequest request) {
+        // 1) Duplicate Kontrolü
+        Optional<News> duplicate = duplicateDetectionService.findDuplicate(request);
+        if (duplicate.isPresent()) {
+            News existing = duplicate.get();
+            boolean updated = false;
+            if (request.getSource() != null && !request.getSource().isBlank()) {
+                if(existing.getSources().add(request.getSource())) updated = true;
+            }
+            if (request.getUrl() != null && !request.getUrl().isBlank()) {
+                if(existing.getUrls().add(request.getUrl())) updated = true;
+            }
+            if (updated) {
+                return newsRepository.save(existing);
+            }
+            return existing; // Aynı ekleme işlemi yapılmadıysa direkt dön
+        }
+
+        // 2) Yeni Kayıt Oluşturma
+        News news = new News();
+        news.setTitle(request.getTitle());
+        news.setContent(request.getContent());
+        news.setType(request.getType());
+        news.setLocationText(request.getLocationText());
+        news.setDistrict(request.getDistrict());
+        
+        if (request.getSource() != null && !request.getSource().isBlank()) {
+            news.getSources().add(request.getSource());
+        }
+        if (request.getUrl() != null && !request.getUrl().isBlank()) {
+            news.getUrls().add(request.getUrl());
+        }
+        
+        // request publish date null ise default anı al
+        news.setPublishDate(request.getPublishDate() != null ? request.getPublishDate() : LocalDateTime.now());
+
+        // 3) Geocoding: locationText varsa otomatik olarak lat/lng elde et
+        String locationText = request.getLocationText();
+        if (locationText != null && !locationText.isBlank()) {
+            com.bedirhan.cityeventmonitor.model.Coordinates coords = geocodingService.geocode(locationText);
+            if (coords != null) {
+                news.setLatitude(coords.getLatitude());
+                news.setLongitude(coords.getLongitude());
+                news.setGeocodingFailed(false);
+            } else {
+                news.setGeocodingFailed(true);
+            }
+        }
+
+        return newsRepository.save(news);
     }
 }
