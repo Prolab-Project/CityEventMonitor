@@ -1,5 +1,74 @@
 package com.bedirhan.cityeventmonitor.controller;
 
+import com.bedirhan.cityeventmonitor.dto.PagedResponse;
+import com.bedirhan.cityeventmonitor.dto.NewsResponseDto;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.http.*;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class NewsControllerIntegrationTest {
+
+    @LocalServerPort
+    private int port;
+
+    @Autowired
+    private TestRestTemplate restTemplate;
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
+
+    private String baseUrl() {
+        return "http://localhost:" + port + "/api/news";
+    }
+
+    @BeforeEach
+    void cleanDb() {
+        mongoTemplate.getDb().drop();
+    }
+
+    @Test
+    void shouldCreateAndFetchNews() {
+        // 1) POST /api/news ile örnek bir haber ekle
+        String createUrl = baseUrl();
+
+        Map<String, Object> body = Map.of(
+                "title", "Integration Test Haberi",
+                "content", "Integration test icerigi",
+                "type", "TRAFIK_KAZASI",
+                "locationText", "Izmit Yahyakaptan",
+                "district", "Izmit",
+                "source", "IntegrationTest",
+                "url", "http://integration.test/haber/1",
+                "publishDate", LocalDateTime.now().toString()
+        );
+
+        ResponseEntity<Void> postResponse = restTemplate.postForEntity(createUrl, body, Void.class);
+        assertThat(postResponse.getStatusCode().is2xxSuccessful()).isTrue();
+
+        // 2) GET /api/news ile sayfalı veri çek ve en az bir kayıt olduğunu doğrula
+        String getUrl = baseUrl() + "?page=0&size=10";
+        ResponseEntity<PagedResponse> getResponse = restTemplate.getForEntity(getUrl, PagedResponse.class);
+
+        assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        PagedResponse<?> responseBody = getResponse.getBody();
+        assertThat(responseBody).isNotNull();
+        assertThat(responseBody.getTotalElements()).isGreaterThanOrEqualTo(1);
+    }
+}
+
+package com.bedirhan.cityeventmonitor.controller;
+
 import com.bedirhan.cityeventmonitor.model.News;
 import com.bedirhan.cityeventmonitor.model.NewsType;
 import com.bedirhan.cityeventmonitor.repository.NewsRepository;

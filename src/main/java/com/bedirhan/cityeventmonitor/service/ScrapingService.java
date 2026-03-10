@@ -77,7 +77,12 @@ public class ScrapingService {
         }
 
         logger.info("Scraping finished. Total: {}, New: {}, Duplicates: {}, Geocoding Failed: {}", totalScraped, newSaved, duplicatesMerged, geocodingFailedCount);
-        return new ScrapeResultDto(totalScraped, newSaved, duplicatesMerged);
+        ScrapeResultDto dto = new ScrapeResultDto();
+        dto.setTotalScraped(totalScraped);
+        dto.setNewSaved(newSaved);
+        dto.setDuplicatesMerged(duplicatesMerged);
+        dto.setGeocodingFailed(geocodingFailedCount);
+        return dto;
     }
 
     record PipelineResult(boolean isNew, boolean isGeocodingFailed) {}

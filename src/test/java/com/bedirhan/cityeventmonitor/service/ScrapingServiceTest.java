@@ -73,6 +73,7 @@ class ScrapingServiceTest {
         assertThat(result.getTotalScraped()).isEqualTo(1);
         assertThat(result.getNewSaved()).isEqualTo(1);
         assertThat(result.getDuplicatesMerged()).isEqualTo(0);
+        assertThat(result.getGeocodingFailed()).isEqualTo(0);
 
         ArgumentCaptor<CreateNewsRequest> captor = ArgumentCaptor.forClass(CreateNewsRequest.class);
         verify(mockNewsService).saveAndEnrichNews(captor.capture());
