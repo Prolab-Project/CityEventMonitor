@@ -39,13 +39,11 @@ public class ScrapingService {
         this.newsService = newsService;
     }
 
-    /**
-     * Tüm yapılandırılmış scraper'ları çalıştırır ve Pipeline'dan geçirir.
-     */
     public ScrapeResultDto scrapeAllSources(int days) {
         int totalScraped = 0;
         int newSaved = 0;
         int duplicatesMerged = 0;
+        int geocodingFailedCount = 0;
         int actualDays = (days > 0) ? days : defaultDays;
 
         logger.info("Starting scrape process for last {} days. Total scrapers: {}", actualDays, scrapers.size());
@@ -57,27 +55,37 @@ public class ScrapingService {
                 totalScraped += rawNewsList.size();
 
                 for (RawNews raw : rawNewsList) {
-                    boolean isNew = processAndSavePipeline(raw);
-                    if (isNew) {
-                        newSaved++;
-                    } else {
-                        duplicatesMerged++;
+                    try {
+                        PipelineResult result = processAndSavePipeline(raw);
+                        if (result.isNew()) {
+                            newSaved++;
+                        } else {
+                            duplicatesMerged++;
+                        }
+                        if (result.isGeocodingFailed()) {
+                            geocodingFailedCount++;
+                            logger.warn("Geocoding failed for news: {} from source: {}", raw.getTitle(), scraper.getSourceName());
+                        }
+                    } catch (Exception ex) {
+                        logger.error("Failed to process RawNews from {}: {}", scraper.getSourceName(), ex.getMessage(), ex);
                     }
                 }
+                logger.info("Scraper '{}' finished. Extracted {} raw items.", scraper.getSourceName(), rawNewsList.size());
             } catch (Exception e) {
                 logger.error("Error occurred while scraping with {}: {}", scraper.getSourceName(), e.getMessage());
             }
         }
 
-        logger.info("Scraping finished. Total: {}, New: {}, Duplicates: {}", totalScraped, newSaved, duplicatesMerged);
+        logger.info("Scraping finished. Total: {}, New: {}, Duplicates: {}, Geocoding Failed: {}", totalScraped, newSaved, duplicatesMerged, geocodingFailedCount);
         return new ScrapeResultDto(totalScraped, newSaved, duplicatesMerged);
     }
 
+    record PipelineResult(boolean isNew, boolean isGeocodingFailed) {}
+
     /**
      * Pipeline akışı. Her RawNews nesnesini işler.
-     * @return Haber yeni bir kayıt olarak kaydedildiyse true, kopyayla birleştirildiyse false döner.
      */
-    private boolean processAndSavePipeline(RawNews raw) {
+    private PipelineResult processAndSavePipeline(RawNews raw) {
         // 1. Text Preprocessing
         String cleanTitle = textPreprocessor.preprocess(raw.getTitle());
         String cleanContent = textPreprocessor.preprocess(raw.getContent());
@@ -110,6 +118,8 @@ public class ScrapingService {
         // kabaca url veya sources sayısına bakarak ya da ID durumuna bakarak anlayabiliriz.
         // saveAndEnrichNews duplicate bulduğunda setlere eleman ekler. İlerde daha net ayrım yapılabilir.
         // Şimdilik eklendiği varsayımı için isNew kontrolü: (eğer source var ama sadece 1 tane ise genelde yenidir)
-        return savedNews.getSources() != null && savedNews.getSources().size() == 1; 
+        boolean isNew = savedNews.getSources() != null && savedNews.getSources().size() == 1;
+        boolean isGeocodingFailed = savedNews.isGeocodingFailed();
+        return new PipelineResult(isNew, isGeocodingFailed);
     }
 }

@@ -11,6 +11,8 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -20,6 +22,8 @@ import java.util.regex.Pattern;
 
 @Service
 public class NewsService {
+
+    private static final Logger logger = LoggerFactory.getLogger(NewsService.class);
 
     private final NewsRepository newsRepository;
     private final MongoTemplate mongoTemplate;
@@ -144,8 +148,10 @@ public class NewsService {
                 if(existing.getUrls().add(request.getUrl())) updated = true;
             }
             if (updated) {
+                logger.info("Duplicate found for URL/Title. Sources/URLs updated for document id: {}", existing.getId());
                 return newsRepository.save(existing);
             }
+            logger.debug("Duplicate found but no new sources/URLs to attach. Ignoring.");
             return existing; // Aynı ekleme işlemi yapılmadıysa direkt dön
         }
 
@@ -175,11 +181,15 @@ public class NewsService {
                 news.setLatitude(coords.getLatitude());
                 news.setLongitude(coords.getLongitude());
                 news.setGeocodingFailed(false);
+                logger.debug("Geocoding successful for locationText: {}", locationText);
             } else {
                 news.setGeocodingFailed(true);
+                logger.warn("Geocoding failed for locationText: {}. Setting latitude/longitude to null.", locationText);
             }
         }
 
-        return newsRepository.save(news);
+        News saved = newsRepository.save(news);
+        logger.info("Successfully created new News record with id: {}", saved.getId());
+        return saved;
     }
 }
