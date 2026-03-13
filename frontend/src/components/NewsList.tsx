@@ -38,7 +38,7 @@ export function NewsList({ items, totalElements, page, size, onPageChange }: New
   return (
     <div className="news-list-root">
       {items.length === 0 ? (
-        <p className="news-list-empty">Henüz haber bulunamadı.</p>
+        <p className="news-list-empty">Bu filtrelerde haber bulunamadı.</p>
       ) : (
         <ul className="news-list">
           {items.map((n) => (

@@ -8,7 +8,7 @@ interface MapViewProps {
 
 const KOCAELI_CENTER = { lat: 40.765, lng: 29.940 }; // yaklaşık Kocaeli merkezi
 
-const containerStyle: google.maps.MapOptions['styles'] | { width: string; height: string } = {
+const containerStyle: React.CSSProperties = {
   width: '100%',
   height: '100%',
 };

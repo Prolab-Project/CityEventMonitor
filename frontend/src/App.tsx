@@ -8,6 +8,7 @@ import FilterPanel from './components/FilterPanel';
 import NewsList from './components/NewsList';
 import MapView from './components/MapView';
 import { getFilters, getNews } from './api/newsApi';
+import { CircularProgress, Alert, Box, Backdrop } from '@mui/material';
 
 function App() {
   // Metadata for filter panel
@@ -95,7 +96,20 @@ function App() {
         </section>
 
         <section className="content-panel">
-          {error && <div className="error-message">{error}</div>}
+          {error && (
+            <Box mb={2}>
+              <Alert severity="error" onClose={() => setError(null)}>
+                {error}
+              </Alert>
+            </Box>
+          )}
+
+          <Backdrop
+            sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+            open={isLoading}
+          >
+            <CircularProgress color="inherit" />
+          </Backdrop>
           
           <div className="map-container">
             <h2>Harita</h2>
@@ -103,7 +117,7 @@ function App() {
           </div>
 
           <div className="list-container">
-            <h2>Haber Listesi {isLoading && <span className="loading-spinner">...</span>}</h2>
+            <h2>Haber Listesi</h2>
             <NewsList
               items={newsPage?.items ?? []}
               totalElements={newsPage?.totalElements ?? 0}
