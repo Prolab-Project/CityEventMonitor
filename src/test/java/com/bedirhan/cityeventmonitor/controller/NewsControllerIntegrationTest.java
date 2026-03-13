@@ -70,7 +70,7 @@ class NewsControllerIntegrationTest {
 }
 
 
-package com.bedirhan.cityeventmonitor.controller;
+    package com.bedirhan.cityeventmonitor.controller;
 
 import com.bedirhan.cityeventmonitor.model.News;
 import com.bedirhan.cityeventmonitor.model.NewsType;

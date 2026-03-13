@@ -6,6 +6,7 @@ import type { PagedResponse } from './types/paged-response';
 import type { FilterState } from './components/FilterPanel';
 import FilterPanel from './components/FilterPanel';
 import NewsList from './components/NewsList';
+import MapView from './components/MapView';
 
 function App() {
   const [filters, setFilters] = useState<Filters | null>(null);
@@ -45,7 +46,7 @@ function App() {
         <section className="content-panel">
           <div className="map-container">
             <h2>Harita</h2>
-            <p>Google Maps bileşeni burada yer alacak.</p>
+            <MapView news={newsPage?.items ?? []} />
           </div>
           <div className="list-container">
             <h2>Haber Listesi</h2>
