@@ -20,7 +20,8 @@ public class LocationExtractor {
             "kandıra",
             "gölcük",
             "derince",
-            "dilovası"
+            "dilovası",
+            "karamürsel"
     );
 
     // Bazı bilinen yer/mahalle/cadde örnekleri

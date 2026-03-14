@@ -110,8 +110,12 @@ public class NewsService {
 
         // 2) Distinct district listesi
         List<String> districts = mongoTemplate.findDistinct("district", News.class, String.class);
-        districts.sort(String::compareTo);
+        districts = districts.stream()
+                .filter(d -> d != null && !d.isBlank())
+                .sorted()
+                .toList();
         response.setDistricts(districts);
+        logger.debug("Fetched {} distinct districts for metadata", districts.size());
 
         // 3) Min publishDate
         Query minQuery = new Query().with(Sort.by(Sort.Direction.ASC, "publishDate")).limit(1);

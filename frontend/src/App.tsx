@@ -8,7 +8,23 @@ import FilterPanel from './components/FilterPanel';
 import NewsList from './components/NewsList';
 import MapView from './components/MapView';
 import { getFilters, getNews } from './api/newsApi';
-import { CircularProgress, Alert, Box, Backdrop } from '@mui/material';
+import { 
+  CircularProgress, 
+  Alert, 
+  Box, 
+  Backdrop,
+  ThemeProvider,
+  createTheme
+} from '@mui/material';
+
+const theme = createTheme({
+  palette: {
+    mode: 'dark', // Keeping it dark by default as the original CSS is dark
+    primary: {
+      main: '#22c55e',
+    },
+  },
+});
 
 function App() {
   // Metadata for filter panel
@@ -78,57 +94,61 @@ function App() {
   };
 
   return (
-    <div className="app-root">
-      <header className="app-header">
-        <h1>City Event Monitor</h1>
-        <span className="app-subtitle">Kocaeli kentsel olay haritası</span>
-      </header>
+    <ThemeProvider theme={theme}>
+      <div className="app-root">
+        <header className="app-header">
+          <h1>City Event Monitor</h1>
+          <span className="app-subtitle">Kocaeli kentsel olay haritası</span>
+        </header>
 
-      <main className="app-main">
-        <section className="filters-panel">
-          <h2>Filtreler</h2>
-          <FilterPanel
-            filters={filtersMetadata}
-            value={filterState}
-            onChange={handleFilterChange}
-            onSubmit={handleFilterSubmit}
-          />
-        </section>
-
-        <section className="content-panel">
-          {error && (
-            <Box mb={2}>
-              <Alert severity="error" onClose={() => setError(null)}>
-                {error}
-              </Alert>
-            </Box>
-          )}
-
-          <Backdrop
-            sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
-            open={isLoading}
-          >
-            <CircularProgress color="inherit" />
-          </Backdrop>
-          
-          <div className="map-container">
-            <h2>Harita</h2>
-            <MapView news={newsPage?.items ?? []} />
-          </div>
-
-          <div className="list-container">
-            <h2>Haber Listesi</h2>
-            <NewsList
-              items={newsPage?.items ?? []}
-              totalElements={newsPage?.totalElements ?? 0}
-              page={page}
-              size={size}
-              onPageChange={handlePageChange}
+        <main className="app-main">
+          <section className="filters-panel">
+            <h2>Filtreler</h2>
+            <FilterPanel
+              filters={filtersMetadata}
+              value={filterState}
+              onChange={handleFilterChange}
+              onSubmit={handleFilterSubmit}
             />
-          </div>
-        </section>
-      </main>
-    </div>
+          </section>
+
+          <section className="content-panel">
+            {error && (
+              <Box mb={2}>
+                <Alert severity="error" onClose={() => setError(null)}>
+                  {error}
+                </Alert>
+              </Box>
+            )}
+            
+            <div className="content-grid">
+              <div className="map-container">
+                <h2>Harita</h2>
+                <MapView news={newsPage?.items ?? []} />
+              </div>
+
+              <div className="list-container">
+                <h2>Haber Listesi</h2>
+                <NewsList
+                  items={newsPage?.items ?? []}
+                  totalElements={newsPage?.totalElements ?? 0}
+                  page={page}
+                  size={size}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <Backdrop
+          sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+          open={isLoading}
+        >
+          <CircularProgress color="inherit" />
+        </Backdrop>
+      </div>
+    </ThemeProvider>
   );
 }
 

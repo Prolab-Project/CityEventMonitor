@@ -133,12 +133,31 @@
 
 .map-container {
   flex: 2;
-  min-height: 380px;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-container > div:last-child {
+  flex: 1;
 }
 
 .list-container {
   flex: 1;
-  min-height: 220px;
+  min-height: 500px;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .map-container h2,
