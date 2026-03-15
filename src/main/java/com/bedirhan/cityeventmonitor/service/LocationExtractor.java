@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 @Service
 public class LocationExtractor {
 
+    /** Kocaeli ilçe isimleri (küçük harf, Türkçe karakterli) */
     private static final List<String> DISTRICTS = List.of(
             "izmit",
             "gebze",
@@ -24,10 +25,24 @@ public class LocationExtractor {
             "karamürsel"
     );
 
+    /** ASCII / yazım varyantları → canonical ilçe adı (küçük) */
+    private static final Map<String, String> DISTRICT_ALIASES = Map.ofEntries(
+            Map.entry("dilovasi", "dilovası"),
+            Map.entry("korfez", "körfez"),
+            Map.entry("cayirova", "çayırova"),
+            Map.entry("basiskele", "başiskele"),
+            Map.entry("kandira", "kandıra"),
+            Map.entry("golcuk", "gölcük"),
+            Map.entry("karamursel", "karamürsel"),
+            Map.entry("darica", "darıca")
+    );
+
     // Bazı bilinen yer/mahalle/cadde örnekleri
     private static final List<String> PLACE_KEYWORDS = List.of(
             "yahyakaptan mahallesi",
+            "yahyakaptan",
             "bekirdere mahallesi",
+            "bekirdere",
             "d-100 karayolu",
             "d100 karayolu",
             "otogar",
@@ -36,7 +51,13 @@ public class LocationExtractor {
             "kocaeli kongre merkezi",
             "sahil yolu",
             "sanayi sitesi",
-            "organize sanayi bölgesi"
+            "organize sanayi bölgesi",
+            "akarca",
+            "hereke",
+            "değirmendere",
+            "gölcük",
+            "körfez",
+            "izmit"
     );
 
     // Genel adres kalıpları
@@ -59,7 +80,11 @@ public class LocationExtractor {
         String district = findDistrict(contentLower);
         String locationText = findLocationText(contentLower);
 
-        // Hiçbir konum bilgisi bulunamadıysa tamamen null dön
+        // İlçe var ama spesifik yer yoksa geocoding için "İlçe, Kocaeli" kullan (haritada gösterebilmek için)
+        if (district != null && (locationText == null || locationText.isBlank())) {
+            locationText = district + ", Kocaeli";
+        }
+
         if (district == null && (locationText == null || locationText.isBlank())) {
             return new LocationResult(null, null);
         }
@@ -71,10 +96,22 @@ public class LocationExtractor {
     }
 
     private String findDistrict(String contentLower) {
+        // 1) Standart ilçe adları
         for (String district : DISTRICTS) {
-            // Tam kelime eşleşmesine daha yakın olması için etrafında boşluk / noktalama da kontrol edilebilir
             if (contentLower.contains(district)) {
-                // Yazım formatını düzgün döndür (ilk harfi büyük, diğerleri küçük)
+                return capitalizeTurkish(district);
+            }
+        }
+        // 2) ASCII / yazım varyantları (örn. "dilovasi", "korfez")
+        for (Map.Entry<String, String> e : DISTRICT_ALIASES.entrySet()) {
+            if (contentLower.contains(e.getKey())) {
+                return capitalizeTurkish(e.getValue());
+            }
+        }
+        // 3) "X ilçesinde", "X'de" kalıplarında ilçe adı başta geçebilir
+        for (String district : DISTRICTS) {
+            if (contentLower.contains(district + " ilçesi") || contentLower.contains(district + " ilçesinde")
+                    || contentLower.contains(district + "'de") || contentLower.contains(district + "'da")) {
                 return capitalizeTurkish(district);
             }
         }

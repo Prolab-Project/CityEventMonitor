@@ -81,4 +81,15 @@ public class NewsController {
     public ScrapeResultDto scrape(@RequestParam(defaultValue = "3") int days) {
         return scrapingService.scrapeAllSources(days);
     }
+
+    /**
+     * Veritabanındaki tüm haberleri yeniden işler (tür, ilçe, geocoding).
+     * Sınıflandırıcı/konum çıkarıcı güncellendikten sonra mevcut kayıtları güncellemek için kullanılır.
+     * POST /api/news/reprocess
+     */
+    @PostMapping("/reprocess")
+    public java.util.Map<String, Integer> reprocess() {
+        int updated = newsService.reprocessAllNews();
+        return java.util.Map.of("updated", updated);
+    }
 }

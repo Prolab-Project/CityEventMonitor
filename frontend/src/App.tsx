@@ -52,6 +52,12 @@ function App() {
       });
   }, []);
 
+  // Backend ISO datetime bekliyor (YYYY-MM-DDTHH:mm:ss); date input sadece YYYY-MM-DD veriyor
+  const toStartOfDay = (dateStr: string | undefined) =>
+    dateStr ? `${dateStr}T00:00:00` : undefined;
+  const toEndOfDay = (dateStr: string | undefined) =>
+    dateStr ? `${dateStr}T23:59:59` : undefined;
+
   // Main data fetching logic
   const fetchNews = useCallback(async () => {
     setIsLoading(true);
@@ -60,8 +66,8 @@ function App() {
       const response = await getNews({
         type: appliedFilters.type || undefined,
         district: appliedFilters.district || undefined,
-        startDate: appliedFilters.startDate || undefined,
-        endDate: appliedFilters.endDate || undefined,
+        startDate: toStartOfDay(appliedFilters.startDate),
+        endDate: toEndOfDay(appliedFilters.endDate),
         search: appliedFilters.search || undefined,
         page,
         size,

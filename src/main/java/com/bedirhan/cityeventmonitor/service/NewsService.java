@@ -3,6 +3,7 @@ package com.bedirhan.cityeventmonitor.service;
 import com.bedirhan.cityeventmonitor.dto.FilterResponse;
 import com.bedirhan.cityeventmonitor.dto.NewsResponseDto;
 import com.bedirhan.cityeventmonitor.dto.PagedResponse;
+import com.bedirhan.cityeventmonitor.model.Coordinates;
 import com.bedirhan.cityeventmonitor.model.News;
 import com.bedirhan.cityeventmonitor.model.NewsType;
 import com.bedirhan.cityeventmonitor.repository.NewsRepository;
@@ -30,16 +31,25 @@ public class NewsService {
     private final DuplicateDetectionService duplicateDetectionService;
     private final GeocodingService geocodingService;
     private final NewsMapper newsMapper;
+    private final TextPreprocessor textPreprocessor;
+    private final NewsTypeClassifier newsTypeClassifier;
+    private final LocationExtractor locationExtractor;
 
     public NewsService(NewsRepository newsRepository, MongoTemplate mongoTemplate,
                        DuplicateDetectionService duplicateDetectionService,
                        GeocodingService geocodingService,
-                       NewsMapper newsMapper) {
+                       NewsMapper newsMapper,
+                       TextPreprocessor textPreprocessor,
+                       NewsTypeClassifier newsTypeClassifier,
+                       LocationExtractor locationExtractor) {
         this.newsRepository = newsRepository;
         this.mongoTemplate = mongoTemplate;
         this.duplicateDetectionService = duplicateDetectionService;
         this.geocodingService = geocodingService;
         this.newsMapper = newsMapper;
+        this.textPreprocessor = textPreprocessor;
+        this.newsTypeClassifier = newsTypeClassifier;
+        this.locationExtractor = locationExtractor;
     }
 
     /**
@@ -198,5 +208,50 @@ public class NewsService {
         News saved = newsRepository.save(news);
         logger.info("Successfully created new News record with id: {}", saved.getId());
         return saved;
+    }
+
+    /**
+     * Veritabanındaki tüm haberleri yeniden işler: tür sınıflandırması, ilçe/konum çıkarımı ve geocoding.
+     * Böylece sınıflandırıcı veya konum çıkarıcı güncellendiğinde mevcut kayıtlar güncellenir.
+     *
+     * @return Güncellenen haber sayısı
+     */
+    public int reprocessAllNews() {
+        List<News> all = newsRepository.findAll();
+        int count = 0;
+        for (News news : all) {
+            try {
+                String raw = (news.getTitle() != null ? news.getTitle() : "") + " " + (news.getContent() != null ? news.getContent() : "");
+                if (raw.isBlank()) {
+                    continue;
+                }
+                String clean = textPreprocessor.preprocess(raw);
+                NewsType type = newsTypeClassifier.classify(clean);
+                LocationResult loc = locationExtractor.extract(clean);
+
+                news.setType(type);
+                if (loc != null) {
+                    news.setDistrict(loc.getDistrict());
+                    news.setLocationText(loc.getLocationText());
+                    String locationText = loc.getLocationText();
+                    if (locationText != null && !locationText.isBlank()) {
+                        Coordinates coords = geocodingService.geocode(locationText);
+                        if (coords != null) {
+                            news.setLatitude(coords.getLatitude());
+                            news.setLongitude(coords.getLongitude());
+                            news.setGeocodingFailed(false);
+                        } else {
+                            news.setGeocodingFailed(true);
+                        }
+                    }
+                }
+                newsRepository.save(news);
+                count++;
+            } catch (Exception e) {
+                logger.warn("Reprocess failed for news id={}: {}", news.getId(), e.getMessage());
+            }
+        }
+        logger.info("Reprocess completed. Updated {} news.", count);
+        return count;
     }
 }
