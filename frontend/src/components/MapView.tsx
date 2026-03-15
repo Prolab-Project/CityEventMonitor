@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { GoogleMap, InfoWindow, Marker, useJsApiLoader } from '@react-google-maps/api';
-import type { News } from '../types/news';
+import type { News, NewsType } from '../types/news';
 
 interface MapViewProps {
   news: News[];
@@ -12,6 +12,30 @@ const containerStyle: React.CSSProperties = {
   width: '100%',
   height: '100%',
 };
+
+/** Haber türüne göre marker rengi (proje şartnamesi: marker rengi ve sembolü türe göre farklı olmalı) */
+const MARKER_COLORS: Record<NewsType, string> = {
+  TRAFIK_KAZASI: '#dc2626',   // kırmızı
+  YANGIN: '#ea580c',           // turuncu
+  ELEKTRIK_KESINTISI: '#ca8a04', // sarı/amber
+  HIRSIZLIK: '#7c3aed',       // mor
+  KULTUREL_ETKINLIK: '#16a34a',  // yeşil
+};
+
+const DEFAULT_MARKER_COLOR = '#6b7280'; // tür yoksa gri
+
+/** Haber türüne göre marker ikonu (Google Maps Symbol: daire, renk türe göre) */
+function getMarkerIcon(type: NewsType | null): google.maps.Symbol {
+  const fillColor = type ? MARKER_COLORS[type] : DEFAULT_MARKER_COLOR;
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor,
+    fillOpacity: 1,
+    strokeColor: '#1f2937',
+    strokeWeight: 1.5,
+    scale: 10,
+  };
+}
 
 export function MapView({ news }: MapViewProps) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
@@ -65,6 +89,7 @@ export function MapView({ news }: MapViewProps) {
         <Marker
           key={n.id}
           position={{ lat: n.latitude, lng: n.longitude }}
+          icon={getMarkerIcon(n.type)}
           onClick={() => setSelectedId(n.id)}
         />
       ))}
