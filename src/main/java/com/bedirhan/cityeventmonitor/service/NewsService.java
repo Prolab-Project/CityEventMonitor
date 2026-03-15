@@ -135,9 +135,11 @@ public class NewsService {
     }
 
     /**
-     * Dışarıdan veya scraper üzerinden gelen ham News oluşturma isteğini zenginleştirir (geocoding) 
+     * Dışarıdan veya scraper üzerinden gelen ham News oluşturma isteğini zenginleştirir (geocoding)
      * ve duplicate kontrolünden (merge) geçirerek kaydeder.
-     * @return Kaydedilen veya güncellenen News nesnesi (Eğer kopya kaynakları birebir aynıysa opsiyonel olarak boolean isNew dönülebilir ama şimdilik sadece News yeterli).
+     * Konum metni verilip geocoding başarısız olursa kayıt oluşturulmaz (şartname: "Geocoding başarısız olursa kayıt işlenmemelidir").
+     *
+     * @return Kaydedilen veya güncellenen News; geocoding başarısızsa null.
      */
     public News saveAndEnrichNews(com.bedirhan.cityeventmonitor.controller.CreateNewsRequest request) {
         // 1) Duplicate Kontrolü
@@ -159,37 +161,38 @@ public class NewsService {
             return existing; // Aynı ekleme işlemi yapılmadıysa direkt dön
         }
 
-        // 2) Yeni Kayıt Oluşturma
+        // 2) Yeni Kayıt — Geocoding: Konum metni varsa koordinat gerekli; başarısızsa kayıt işlenmez
+        String locationText = request.getLocationText();
+        com.bedirhan.cityeventmonitor.model.Coordinates coords = null;
+        if (locationText != null && !locationText.isBlank()) {
+            coords = geocodingService.geocode(locationText);
+            if (coords == null) {
+                logger.warn("Geocoding failed for locationText: '{}'. Kayıt oluşturulmadı.", locationText);
+                return null;
+            }
+        }
+
+        // 3) Yeni Kayıt Oluşturma
         News news = new News();
         news.setTitle(request.getTitle());
         news.setContent(request.getContent());
         news.setType(request.getType());
         news.setLocationText(request.getLocationText());
         news.setDistrict(request.getDistrict());
-        
+
         if (request.getSource() != null && !request.getSource().isBlank()) {
             news.getSources().add(request.getSource());
         }
         if (request.getUrl() != null && !request.getUrl().isBlank()) {
             news.getUrls().add(request.getUrl());
         }
-        
-        // request publish date null ise default anı al
+
         news.setPublishDate(request.getPublishDate() != null ? request.getPublishDate() : LocalDateTime.now());
 
-        // 3) Geocoding: locationText varsa otomatik olarak lat/lng elde et
-        String locationText = request.getLocationText();
-        if (locationText != null && !locationText.isBlank()) {
-            com.bedirhan.cityeventmonitor.model.Coordinates coords = geocodingService.geocode(locationText);
-            if (coords != null) {
-                news.setLatitude(coords.getLatitude());
-                news.setLongitude(coords.getLongitude());
-                news.setGeocodingFailed(false);
-                logger.debug("Geocoding successful for locationText: {}", locationText);
-            } else {
-                news.setGeocodingFailed(true);
-                logger.warn("Geocoding failed for locationText: {}. Setting latitude/longitude to null.", locationText);
-            }
+        if (coords != null) {
+            news.setLatitude(coords.getLatitude());
+            news.setLongitude(coords.getLongitude());
+            news.setGeocodingFailed(false);
         }
 
         News saved = newsRepository.save(news);

@@ -57,14 +57,13 @@ public class ScrapingService {
                 for (RawNews raw : rawNewsList) {
                     try {
                         PipelineResult result = processAndSavePipeline(raw);
-                        if (result.isNew()) {
-                            newSaved++;
-                        } else {
-                            duplicatesMerged++;
-                        }
                         if (result.isGeocodingFailed()) {
                             geocodingFailedCount++;
                             logger.warn("Geocoding failed for news: {} from source: {}", raw.getTitle(), scraper.getSourceName());
+                        } else if (result.isNew()) {
+                            newSaved++;
+                        } else {
+                            duplicatesMerged++;
                         }
                     } catch (Exception ex) {
                         logger.error("Failed to process RawNews from {}: {}", scraper.getSourceName(), ex.getMessage(), ex);
@@ -117,14 +116,14 @@ public class ScrapingService {
         }
 
         // 5. Geocoding, Duplicate Detection ve DB Save (NewsService içinde)
+        // Geocoding başarısızsa saveAndEnrichNews null döner; kayıt oluşturulmaz.
         News savedNews = newsService.saveAndEnrichNews(request);
-        
-        // Bu aşamada haberin yeni mi yoksa güncellenen bir kopya mı olduğunu
-        // kabaca url veya sources sayısına bakarak ya da ID durumuna bakarak anlayabiliriz.
-        // saveAndEnrichNews duplicate bulduğunda setlere eleman ekler. İlerde daha net ayrım yapılabilir.
-        // Şimdilik eklendiği varsayımı için isNew kontrolü: (eğer source var ama sadece 1 tane ise genelde yenidir)
+
+        if (savedNews == null) {
+            return new PipelineResult(false, true); // geocoding failed, not saved
+        }
+
         boolean isNew = savedNews.getSources() != null && savedNews.getSources().size() == 1;
-        boolean isGeocodingFailed = savedNews.isGeocodingFailed();
-        return new PipelineResult(isNew, isGeocodingFailed);
+        return new PipelineResult(isNew, false);
     }
 }

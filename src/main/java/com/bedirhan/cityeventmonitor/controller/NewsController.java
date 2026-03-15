@@ -9,6 +9,8 @@ import com.bedirhan.cityeventmonitor.model.NewsType;
 import com.bedirhan.cityeventmonitor.service.NewsService;
 import com.bedirhan.cityeventmonitor.service.ScrapingService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -59,9 +61,16 @@ public class NewsController {
         return newsService.getFilterMetadata();
     }
 
+    /**
+     * Manuel haber oluşturma. Konum metni verilip geocoding başarısız olursa 422 döner.
+     */
     @PostMapping
-    public News createNews(@RequestBody CreateNewsRequest request) {
-        return newsService.saveAndEnrichNews(request);
+    public ResponseEntity<News> createNews(@RequestBody CreateNewsRequest request) {
+        News news = newsService.saveAndEnrichNews(request);
+        if (news == null) {
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).build();
+        }
+        return ResponseEntity.ok(news);
     }
 
     /**

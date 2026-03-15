@@ -32,4 +32,5 @@ build/
 ### VS Code ###
 .vscode/
 
-src/main/resources/application.properties
+# Yerel API anahtarları ve hassas ayarlar (proje kökünde)
+application-local.properties
