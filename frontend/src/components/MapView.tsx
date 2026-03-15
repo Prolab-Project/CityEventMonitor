@@ -102,18 +102,29 @@ export function MapView({ news }: MapViewProps) {
           <div className="map-infowindow">
             <h3>{selectedNews.title}</h3>
             <p>{selectedNews.district ?? 'İlçe bilgisi yok'}</p>
-            <p>{new Date(selectedNews.publishDate).toLocaleString('tr-TR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}</p>
-            <p>Kaynak sayısı: {selectedNews.sources.length}</p>
-            {selectedNews.urls[0] && (
-              <a href={selectedNews.urls[0]} target="_blank" rel="noreferrer">
-                Habere git
-              </a>
+            <p>
+              {new Date(selectedNews.publishDate).toLocaleString('tr-TR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+            {selectedNews.sources.length > 0 && (
+              <p>
+                <strong>Kaynak:</strong>{' '}
+                {selectedNews.sources.join(', ')}
+              </p>
+            )}
+            {selectedNews.urls.length > 0 && (
+              <p className="map-infowindow-links">
+                {selectedNews.urls.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noreferrer">
+                    Habere git{selectedNews!.urls.length > 1 ? ` (${i + 1})` : ''}
+                  </a>
+                ))}
+              </p>
             )}
           </div>
         </InfoWindow>

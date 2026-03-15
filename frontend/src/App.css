@@ -173,6 +173,39 @@
   color: #e5e7eb;
 }
 
+.map-infowindow {
+  min-width: 200px;
+  color: #1f2937;
+}
+
+.map-infowindow h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.map-infowindow p {
+  margin: 0.35rem 0;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.map-infowindow-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem !important;
+}
+
+.map-infowindow-links a {
+  color: #16a34a;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.map-infowindow-links a:hover {
+  text-decoration: underline;
+}
+
 .news-list-root {
   display: flex;
   flex: 1;
