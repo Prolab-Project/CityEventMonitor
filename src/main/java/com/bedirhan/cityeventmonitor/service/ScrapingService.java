@@ -23,6 +23,7 @@ public class ScrapingService {
     private final NewsTypeClassifier newsTypeClassifier;
     private final LocationExtractor locationExtractor;
     private final NewsService newsService;
+    private final NewsDateParser newsDateParser;
 
     @Value("${scraping.default-days:3}")
     private int defaultDays;
@@ -31,12 +32,14 @@ public class ScrapingService {
                            TextPreprocessor textPreprocessor,
                            NewsTypeClassifier newsTypeClassifier,
                            LocationExtractor locationExtractor,
-                           NewsService newsService) {
+                           NewsService newsService,
+                           NewsDateParser newsDateParser) {
         this.scrapers = scrapers;
         this.textPreprocessor = textPreprocessor;
         this.newsTypeClassifier = newsTypeClassifier;
         this.locationExtractor = locationExtractor;
         this.newsService = newsService;
+        this.newsDateParser = newsDateParser;
     }
 
     public ScrapeResultDto scrapeAllSources(int days) {
@@ -107,12 +110,15 @@ public class ScrapingService {
         request.setType(newsType);
         request.setSource(raw.getSourceName());
         request.setUrl(raw.getUrl());
-        // For now, defaulting publishDate to now since we haven't implemented Date parsing for scrapers yet
-        request.setPublishDate(LocalDateTime.now());
+
+        LocalDateTime publishDate = raw.getRawDate() != null ? newsDateParser.parse(raw.getRawDate()) : null;
+        request.setPublishDate(publishDate != null ? publishDate : LocalDateTime.now());
 
         if (locationResult != null) {
             request.setDistrict(locationResult.getDistrict());
             request.setLocationText(locationResult.getLocationText());
+        } else if (raw.getRawLocationText() != null && !raw.getRawLocationText().isBlank()) {
+            request.setLocationText(raw.getRawLocationText());
         }
 
         // 5. Geocoding, Duplicate Detection ve DB Save (NewsService içinde)
