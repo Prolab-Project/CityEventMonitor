@@ -61,29 +61,7 @@ public class NewsService {
                                                        String search,
                                                        int page, int size) {
 
-        Query query = new Query();
-
-        if (type != null) {
-            query.addCriteria(Criteria.where("type").is(type));
-        }
-        if (district != null && !district.isBlank()) {
-            query.addCriteria(Criteria.where("district").is(district));
-        }
-        if (startDate != null && endDate != null) {
-            query.addCriteria(Criteria.where("publishDate").gte(startDate).lte(endDate));
-        } else if (startDate != null) {
-            query.addCriteria(Criteria.where("publishDate").gte(startDate));
-        } else if (endDate != null) {
-            query.addCriteria(Criteria.where("publishDate").lte(endDate));
-        }
-        if (search != null && !search.isBlank()) {
-            // title veya content içinde case-insensitive arama
-            Pattern regex = Pattern.compile(Pattern.quote(search), Pattern.CASE_INSENSITIVE);
-            query.addCriteria(new Criteria().orOperator(
-                    Criteria.where("title").regex(regex),
-                    Criteria.where("content").regex(regex)
-            ));
-        }
+        Query query = buildFilteredQuery(type, district, startDate, endDate, search);
 
         // Toplam kayıt sayısını hesapla
         long total = mongoTemplate.count(query, News.class);
@@ -104,6 +82,45 @@ public class NewsService {
         response.setSize(size);
 
         return response;
+    }
+
+    /**
+     * Harita için sayfalamasız filtreli liste.
+     */
+    public List<NewsResponseDto> findFilteredForMap(NewsType type, String district,
+                                                    LocalDateTime startDate, LocalDateTime endDate,
+                                                    String search) {
+        Query query = buildFilteredQuery(type, district, startDate, endDate, search);
+        query.with(Sort.by(Sort.Direction.DESC, "publishDate"));
+        List<News> newsList = mongoTemplate.find(query, News.class);
+        return newsMapper.toDtoList(newsList);
+    }
+
+    private Query buildFilteredQuery(NewsType type, String district,
+                                     LocalDateTime startDate, LocalDateTime endDate,
+                                     String search) {
+        Query query = new Query();
+        if (type != null) {
+            query.addCriteria(Criteria.where("type").is(type));
+        }
+        if (district != null && !district.isBlank()) {
+            query.addCriteria(Criteria.where("district").is(district));
+        }
+        if (startDate != null && endDate != null) {
+            query.addCriteria(Criteria.where("publishDate").gte(startDate).lte(endDate));
+        } else if (startDate != null) {
+            query.addCriteria(Criteria.where("publishDate").gte(startDate));
+        } else if (endDate != null) {
+            query.addCriteria(Criteria.where("publishDate").lte(endDate));
+        }
+        if (search != null && !search.isBlank()) {
+            Pattern regex = Pattern.compile(Pattern.quote(search), Pattern.CASE_INSENSITIVE);
+            query.addCriteria(new Criteria().orOperator(
+                    Criteria.where("title").regex(regex),
+                    Criteria.where("content").regex(regex)
+            ));
+        }
+        return query;
     }
 
     /**
@@ -175,7 +192,8 @@ public class NewsService {
         String locationText = request.getLocationText();
         com.bedirhan.cityeventmonitor.model.Coordinates coords = null;
         if (locationText != null && !locationText.isBlank()) {
-            coords = geocodingService.geocode(locationText);
+            String geocodingQuery = buildGeocodingQuery(locationText, request.getDistrict());
+            coords = geocodingService.geocode(geocodingQuery);
             if (coords == null) {
                 logger.warn("Geocoding failed for locationText: '{}'. Kayıt oluşturulmadı.", locationText);
                 return null;
@@ -203,6 +221,9 @@ public class NewsService {
             news.setLatitude(coords.getLatitude());
             news.setLongitude(coords.getLongitude());
             news.setGeocodingFailed(false);
+        } else {
+            // Konum bilgisi yoksa haritada yanlışlıkla gösterilmemesi için başarısız kabul et.
+            news.setGeocodingFailed(true);
         }
 
         News saved = newsRepository.save(news);
@@ -235,7 +256,8 @@ public class NewsService {
                     news.setLocationText(loc.getLocationText());
                     String locationText = loc.getLocationText();
                     if (locationText != null && !locationText.isBlank()) {
-                        Coordinates coords = geocodingService.geocode(locationText);
+                        String geocodingQuery = buildGeocodingQuery(locationText, loc.getDistrict());
+                        Coordinates coords = geocodingService.geocode(geocodingQuery);
                         if (coords != null) {
                             news.setLatitude(coords.getLatitude());
                             news.setLongitude(coords.getLongitude());
@@ -243,7 +265,17 @@ public class NewsService {
                         } else {
                             news.setGeocodingFailed(true);
                         }
+                    } else {
+                        news.setLatitude(0);
+                        news.setLongitude(0);
+                        news.setGeocodingFailed(true);
                     }
+                } else {
+                    news.setDistrict(null);
+                    news.setLocationText(null);
+                    news.setLatitude(0);
+                    news.setLongitude(0);
+                    news.setGeocodingFailed(true);
                 }
                 newsRepository.save(news);
                 count++;
@@ -253,5 +285,25 @@ public class NewsService {
         }
         logger.info("Reprocess completed. Updated {} news.", count);
         return count;
+    }
+
+    /**
+     * Geocoding sorgusunu Kocaeli bağlamına zorlar.
+     * Böylece aynı isimli başka şehir/ilçelere kayma ihtimali azalır.
+     */
+    private String buildGeocodingQuery(String locationText, String district) {
+        String query = locationText != null ? locationText.trim() : "";
+        String lower = query.toLowerCase();
+        if (district != null && !district.isBlank() && !lower.contains(district.toLowerCase())) {
+            query = query + ", " + district;
+            lower = query.toLowerCase();
+        }
+        if (!lower.contains("kocaeli")) {
+            query = query + ", Kocaeli";
+        }
+        if (!query.toLowerCase().contains("türkiye") && !query.toLowerCase().contains("turkiye")) {
+            query = query + ", Türkiye";
+        }
+        return query;
     }
 }

@@ -57,8 +57,13 @@ public class ScrapingService {
                 List<RawNews> rawNewsList = scraper.scrape(actualDays);
                 totalScraped += rawNewsList.size();
 
+                LocalDateTime cutoff = LocalDateTime.now().minusDays(actualDays);
                 for (RawNews raw : rawNewsList) {
                     try {
+                        if (!isWithinLastDays(raw, cutoff)) {
+                            logger.debug("Haber son {} gün dışında, atlanıyor: {}", actualDays, raw.getTitle());
+                            continue;
+                        }
                         PipelineResult result = processAndSavePipeline(raw);
                         if (result.isGeocodingFailed()) {
                             geocodingFailedCount++;
@@ -131,5 +136,20 @@ public class ScrapingService {
 
         boolean isNew = savedNews.getSources() != null && savedNews.getSources().size() == 1;
         return new PipelineResult(isNew, false);
+    }
+
+    /**
+     * Haberin son N gün içinde olup olmadığını kontrol eder.
+     * rawDate yoksa veya parse edilemezse "son N gün" varsayımı ile kabul edilir (raporda belirtilebilir).
+     */
+    private boolean isWithinLastDays(RawNews raw, LocalDateTime cutoff) {
+        if (raw.getRawDate() == null || raw.getRawDate().isBlank()) {
+            return true;
+        }
+        LocalDateTime parsed = newsDateParser.parse(raw.getRawDate());
+        if (parsed == null) {
+            return true;
+        }
+        return !parsed.isBefore(cutoff);
     }
 }

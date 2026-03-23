@@ -247,6 +247,12 @@
   text-decoration: underline;
 }
 
+.news-list-location {
+  font-size: 0.82rem;
+  color: #93c5fd;
+  margin-top: 0.1rem;
+}
+
 .news-list-meta {
   display: flex;
   flex-wrap: wrap;

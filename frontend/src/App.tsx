@@ -6,8 +6,8 @@ import type { PagedResponse } from './types/paged-response';
 import type { FilterState } from './components/FilterPanel';
 import FilterPanel from './components/FilterPanel';
 import NewsList from './components/NewsList';
-import MapView from './components/MapView';
-import { getFilters, getNews } from './api/newsApi';
+import MapCanvas from './components/MapCanvas';
+import { getFilters, getMapNews, getNews } from './api/newsApi';
 import { 
   CircularProgress, 
   Alert, 
@@ -37,6 +37,7 @@ function App() {
   const [appliedFilters, setAppliedFilters] = useState<FilterState>({});
 
   const [newsPage, setNewsPage] = useState<PagedResponse<News> | null>(null);
+  const [mapNews, setMapNews] = useState<News[]>([]);
   const [page, setPage] = useState(0);
   const [size] = useState(20);
   
@@ -73,6 +74,16 @@ function App() {
         size,
       });
       setNewsPage(response);
+
+      // Harita sayfalamadan bağımsız çalışmalı; filtreye uyan tüm haberleri al.
+      const mapItems = await getMapNews({
+        type: appliedFilters.type || undefined,
+        district: appliedFilters.district || undefined,
+        startDate: toStartOfDay(appliedFilters.startDate),
+        endDate: toEndOfDay(appliedFilters.endDate),
+        search: appliedFilters.search || undefined,
+      });
+      setMapNews(mapItems);
     } catch (err: any) {
       console.error('Error fetching news:', err);
       setError('Haberler yüklenirken bir hata oluştu. Lütfen tekrar deneyin.');
@@ -130,7 +141,7 @@ function App() {
             <div className="content-grid">
               <div className="map-container">
                 <h2>Harita</h2>
-                <MapView news={newsPage?.items ?? []} />
+                <MapCanvas news={mapNews} />
               </div>
 
               <div className="list-container">

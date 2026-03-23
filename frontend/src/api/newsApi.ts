@@ -20,6 +20,13 @@ export async function getNews(params: NewsQueryParams): Promise<PagedResponse<Ne
   return response.data;
 }
 
+export async function getMapNews(params: NewsQueryParams): Promise<News[]> {
+  const response = await apiClient.get<News[]>('/news/map', {
+    params,
+  });
+  return response.data;
+}
+
 export async function getFilters(): Promise<Filters> {
   const response = await apiClient.get<Filters>('/news/filters');
   return response.data;

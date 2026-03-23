@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/news")
@@ -48,6 +49,20 @@ public class NewsController {
         int safeSize = Math.min(Math.max(size, 1), 100); // min 1, max 100
 
         return newsService.findFiltered(type, district, startDate, endDate, search, safePage, safeSize);
+    }
+
+    /**
+     * Harita için sayfalamasız filtreli haber listesi.
+     * GET /api/news/map?type=...&district=...&startDate=...&endDate=...&search=...
+     */
+    @GetMapping("/map")
+    public List<NewsResponseDto> getNewsForMap(
+            @RequestParam(required = false) NewsType type,
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(required = false) String search) {
+        return newsService.findFilteredForMap(type, district, startDate, endDate, search);
     }
 
     /**

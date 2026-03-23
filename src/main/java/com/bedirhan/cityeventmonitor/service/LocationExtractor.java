@@ -85,6 +85,8 @@ public class LocationExtractor {
             locationText = district + ", Kocaeli";
         }
 
+        // Konum bilgisi yoksa harita için zorlama fallback kullanma.
+        // Bu durumda haber listede görünür, fakat haritada marker olarak gösterilmez.
         if (district == null && (locationText == null || locationText.isBlank())) {
             return new LocationResult(null, null);
         }
@@ -96,26 +98,44 @@ public class LocationExtractor {
     }
 
     private String findDistrict(String contentLower) {
-        // 1) Standart ilçe adları
+        // Birden fazla ilçe geçtiğinde ilk bulduğunu almak hatalı sonuç üretebiliyor.
+        // Bu yüzden ilçe adaylarını skorlayıp en güçlü eşleşmeyi seçiyoruz.
+        Map<String, Integer> scores = new HashMap<>();
+
         for (String district : DISTRICTS) {
-            if (contentLower.contains(district)) {
-                return capitalizeTurkish(district);
+            int score = 0;
+            if (contentLower.contains(district)) score += 1;
+            if (contentLower.contains(district + " ilçesi")) score += 3;
+            if (contentLower.contains(district + " ilçesinde")) score += 3;
+            if (contentLower.contains(district + "'de") || contentLower.contains(district + "'da")) score += 2;
+            if (score > 0) {
+                scores.put(district, Math.max(scores.getOrDefault(district, 0), score));
             }
         }
-        // 2) ASCII / yazım varyantları (örn. "dilovasi", "korfez")
+
         for (Map.Entry<String, String> e : DISTRICT_ALIASES.entrySet()) {
-            if (contentLower.contains(e.getKey())) {
-                return capitalizeTurkish(e.getValue());
+            String alias = e.getKey();
+            String canonical = e.getValue();
+            int score = 0;
+            if (contentLower.contains(alias)) score += 1;
+            if (contentLower.contains(alias + " ilçesi")) score += 3;
+            if (contentLower.contains(alias + " ilçesinde")) score += 3;
+            if (contentLower.contains(alias + "'de") || contentLower.contains(alias + "'da")) score += 2;
+            if (score > 0) {
+                scores.put(canonical, Math.max(scores.getOrDefault(canonical, 0), score));
             }
         }
-        // 3) "X ilçesinde", "X'de" kalıplarında ilçe adı başta geçebilir
-        for (String district : DISTRICTS) {
-            if (contentLower.contains(district + " ilçesi") || contentLower.contains(district + " ilçesinde")
-                    || contentLower.contains(district + "'de") || contentLower.contains(district + "'da")) {
-                return capitalizeTurkish(district);
+
+        String best = null;
+        int bestScore = -1;
+        for (Map.Entry<String, Integer> e : scores.entrySet()) {
+            if (e.getValue() > bestScore) {
+                best = e.getKey();
+                bestScore = e.getValue();
             }
         }
-        return null;
+
+        return best != null ? capitalizeTurkish(best) : null;
     }
 
     private String findLocationText(String contentLower) {

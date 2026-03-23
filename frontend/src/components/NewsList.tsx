@@ -52,6 +52,11 @@ export function NewsList({ items, totalElements, page, size, onPageChange }: New
                 >
                   {n.title}
                 </a>
+                {n.locationText && (
+                  <div className="news-list-location">
+                    Konum: {n.locationText}
+                  </div>
+                )}
                 <div className="news-list-meta">
                   <span>{n.district ?? 'İlçe bilgisi yok'}</span>
                   <span>{n.type ?? 'Tür bilinmiyor'}</span>
