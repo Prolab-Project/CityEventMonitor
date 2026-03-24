@@ -12,6 +12,8 @@ import java.util.Map;
 public class NewsTypeClassifier {
 
     private final Map<NewsType, List<String>> keywordMap = new EnumMap<>(NewsType.class);
+    private final Map<NewsType, List<String>> positiveContextMap = new EnumMap<>(NewsType.class);
+    private final Map<NewsType, List<String>> negativeContextMap = new EnumMap<>(NewsType.class);
     private final List<NewsType> priorityOrder = List.of(
             NewsType.TRAFIK_KAZASI,
             NewsType.YANGIN,
@@ -33,7 +35,7 @@ public class NewsTypeClassifier {
         keywordMap.put(NewsType.ELEKTRIK_KESINTISI, List.of(
                 "elektrik kesintisi", "enerji kesintisi", "planlı kesinti", "bakım çalışması",
                 "trafo arızası", "hat çalışması", "yüksek gerilim hattı", "aydınlatma arızası",
-                "elektrik kesildi", "kesinti", "tedarik", "arıza", "şebeke"
+                "elektrik kesildi", "tedarik", "arıza", "şebeke", "sedaş", "kesinti programı"
         ));
         keywordMap.put(NewsType.HIRSIZLIK, List.of(
                 "hırsızlık", "soygun", "gasp", "hırsız", "evden hırsızlık", "iş yerinden hırsızlık",
@@ -45,7 +47,44 @@ public class NewsTypeClassifier {
                 "kültür merkezi", "kongre merkezi", "sanatçı", "gösteri", "açılış", "temel atıldı", "temeli atıldı",
                 "tören", "açıldı", "ziyaret", "buluştu", "vatandaş", "futbol", "maç", "şampiyona", "lig",
                 "spor", "röportaj", "söyleşi", "müftülük", "başkan", "belediye", "toplantı", "davet",
-                "sergi", "söyleşi", "canlı yayın", "röportaj", "kongre", "seminer", "eğitim", "kurs"
+                "sergi", "söyleşi", "canlı yayın", "röportaj", "kongre", "seminer", "eğitim", "kurs",
+                "kocaelispor", "transfer", "imza", "forvet", "stoper", "orta saha", "teknik direktör", "oyuncu"
+        ));
+
+        // Türe özel bağlam sinyalleri (yanlış pozitifleri azaltmak için)
+        positiveContextMap.put(NewsType.TRAFIK_KAZASI, List.of(
+                "kaza", "çarpış", "yaralı", "ambulans", "sürücü", "araç", "olay yeri", "trafik"
+        ));
+        negativeContextMap.put(NewsType.TRAFIK_KAZASI, List.of(
+                "transfer", "oyuncu", "festival", "konser", "elektrik kesintisi", "hırsızlık"
+        ));
+
+        positiveContextMap.put(NewsType.YANGIN, List.of(
+                "yangın", "alev", "itfaiye", "duman", "söndür", "müdahale"
+        ));
+        negativeContextMap.put(NewsType.YANGIN, List.of(
+                "transfer", "futbol", "konser", "elektrik kesintisi"
+        ));
+
+        positiveContextMap.put(NewsType.ELEKTRIK_KESINTISI, List.of(
+                "elektrik", "enerji", "şebeke", "trafo", "sedaş", "planlı", "bakım", "hat", "gerilim"
+        ));
+        negativeContextMap.put(NewsType.ELEKTRIK_KESINTISI, List.of(
+                "transfer", "oyuncu", "kocaelispor", "festival", "konser", "hırsızlık"
+        ));
+
+        positiveContextMap.put(NewsType.HIRSIZLIK, List.of(
+                "hırsız", "çalın", "polis", "gözalt", "tutuk", "şüpheli", "soygun", "gasp"
+        ));
+        negativeContextMap.put(NewsType.HIRSIZLIK, List.of(
+                "transfer", "maç", "konser", "elektrik kesintisi", "trafik kazası"
+        ));
+
+        positiveContextMap.put(NewsType.KULTUREL_ETKINLIK, List.of(
+                "etkinlik", "konser", "festival", "tiyatro", "sergi", "söyleşi", "maç", "transfer", "oyuncu", "imza"
+        ));
+        negativeContextMap.put(NewsType.KULTUREL_ETKINLIK, List.of(
+                "elektrik kesintisi", "trafo", "hırsızlık", "gasp", "trafik kazası", "yangın"
         ));
     }
 
@@ -94,11 +133,39 @@ public class NewsTypeClassifier {
             if (keyword == null || keyword.isBlank()) {
                 continue;
             }
-            if (content.contains(keyword.toLowerCase(Locale.forLanguageTag("tr-TR")))) {
-                score++;
+            String normalizedKeyword = keyword.toLowerCase(Locale.forLanguageTag("tr-TR"));
+            if (content.contains(normalizedKeyword)) {
+                // Çok belirleyici çok-kelimeli ifadeleri daha yüksek puanla
+                score += normalizedKeyword.contains(" ") ? 2 : 1;
             }
         }
+
+        int positiveMatches = countContains(content, positiveContextMap.get(type));
+        int negativeMatches = countContains(content, negativeContextMap.get(type));
+
+        // Pozitif bağlam skoru hafif artırır, negatif bağlam skoru düşürür.
+        score += positiveMatches;
+        score -= (negativeMatches * 2);
+
+        // Güvenlik: skor negatif olmasın.
+        if (score < 0) {
+            score = 0;
+        }
+
         return score;
+    }
+
+    private int countContains(String content, List<String> terms) {
+        if (terms == null || terms.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (String term : terms) {
+            if (term != null && !term.isBlank() && content.contains(term)) {
+                count++;
+            }
+        }
+        return count;
     }
 }
 

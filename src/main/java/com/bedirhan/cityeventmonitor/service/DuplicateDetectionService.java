@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -64,15 +65,19 @@ public class DuplicateDetectionService {
             return Optional.empty(); // Karşılaştırılacak haber yok
         }
 
-        Map<CharSequence, Integer> newVector = embeddingService.generateTermFrequencyVector(title, content);
+        List<Double> newVector = embeddingService.generateEmbedding(title, content);
         if (newVector.isEmpty()) {
             return Optional.empty();
         }
 
+        Map<String, List<Double>> embeddingCache = new HashMap<>();
         for (News existingNews : recentNews) {
-            Map<CharSequence, Integer> existingVector = embeddingService.generateTermFrequencyVector(existingNews.getTitle(), existingNews.getContent());
-            
-            double score = similarityService.calculateSimilarity(newVector, existingVector);
+            List<Double> existingVector = embeddingCache.computeIfAbsent(
+                    existingNews.getId(),
+                    key -> embeddingService.generateEmbedding(existingNews.getTitle(), existingNews.getContent())
+            );
+
+            double score = similarityService.calculateEmbeddingSimilarity(newVector, existingVector);
             if (score >= 0.90) { // SIMILARITY_THRESHOLD = 0.90
                 log.info("Duplicate bulundu (Similarity >= 0.90) : Score={}, Mevcut Haber ID={}", score, existingNews.getId());
                 return Optional.of(existingNews);

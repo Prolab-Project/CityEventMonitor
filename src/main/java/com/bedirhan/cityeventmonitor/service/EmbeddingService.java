@@ -1,69 +1,123 @@
 package com.bedirhan.cityeventmonitor.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 public class EmbeddingService {
 
-    private final TextPreprocessor textPreprocessor;
+    private static final Logger log = LoggerFactory.getLogger(EmbeddingService.class);
+    private static final int FALLBACK_DIM = 256;
 
-    public EmbeddingService(TextPreprocessor textPreprocessor) {
+    private final TextPreprocessor textPreprocessor;
+    private final WebClient webClient;
+    private final String apiKey;
+    private final String model;
+
+    public EmbeddingService(TextPreprocessor textPreprocessor,
+                            WebClient.Builder webClientBuilder,
+                            @Value("${embedding.api-key:}") String apiKey,
+                            @Value("${embedding.model:sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}") String model,
+                            @Value("${embedding.base-url:https://api-inference.huggingface.co/models}") String baseUrl) {
         this.textPreprocessor = textPreprocessor;
+        this.apiKey = apiKey;
+        this.model = model;
+        this.webClient = webClientBuilder.baseUrl(baseUrl).build();
     }
 
     /**
-     * Haber başlığı ve metnini kullanarak kelime frekans haritası üretir.
-     * Apache Commons Text'in CosineSimilarity sınıfı Map<CharSequence, Integer> bekler.
-     *
-     * @param title Haber başlığı
-     * @param content Haber içeriği
-     * @return Kelime frekans vektörü (Term Frequency - TF)
+     * Başlık + içerikten embedding üretir.
+     * Öncelik: Harici embedding modeli (HuggingFace Inference API).
+     * API key yoksa/başarısızsa fallback hash-embedding döner (sistem akışı bozulmasın diye).
      */
-    public Map<CharSequence, Integer> generateTermFrequencyVector(String title, String content) {
+    public List<Double> generateEmbedding(String title, String content) {
         String combined = (title != null ? title : "") + " " + (content != null ? content : "");
-        
-        // Mevcut TextPreprocessor ile temizle ve normalize et
         String cleanedText = textPreprocessor.preprocess(combined);
-
-        Map<CharSequence, Integer> vector = new HashMap<>();
         if (cleanedText.isBlank()) {
-            return vector;
+            return List.of();
         }
 
-        // Kelimelere böl
-        String[] words = cleanedText.split("\\s+");
-        for (String word : words) {
-            // Basit stop-word filtresi (çok kısa ve anlamsız bağlaçları çıkar)
-            if (isStopWord(word)) {
-                continue;
-            }
-            vector.put(word, vector.getOrDefault(word, 0) + 1);
+        List<Double> modelVector = tryRemoteEmbedding(cleanedText);
+        if (modelVector != null && !modelVector.isEmpty()) {
+            return modelVector;
         }
-
-        // Başlıktaki kelimelerin ağırlığını artır (Title weight x2)
-        if (title != null && !title.isBlank()) {
-            String cleanedTitle = textPreprocessor.preprocess(title);
-            String[] titleWords = cleanedTitle.split("\\s+");
-            for (String tw : titleWords) {
-                if (!isStopWord(tw)) {
-                    vector.put(tw, vector.getOrDefault(tw, 0) + 1);
-                }
-            }
-        }
-
-        return vector;
+        return fallbackHashEmbedding(cleanedText);
     }
 
-    private boolean isStopWord(String word) {
-        if (word.length() <= 2) { // "ve", "de", "da", "mi" vb.
-            return true;
+    private List<Double> tryRemoteEmbedding(String text) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return null;
         }
-        // Temel Türkçe stop-word'ler
-        return word.matches("^(için|ile|gibi|kadar|göre|üzere|olarak|isimli|olan|ilgili|sonra|önce|ancak|fakat|veya|ya da|hem|ayrıca)$");
+        try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("inputs", text);
+            body.put("options", Map.of("wait_for_model", true));
+
+            @SuppressWarnings("unchecked")
+            List<Object> response = webClient.post()
+                    .uri("/" + model)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(List.class)
+                    .block();
+
+            if (response == null || response.isEmpty()) {
+                return null;
+            }
+            // HF bazen [float,float,...], bazen [[float,...]] dönebiliyor.
+            Object first = response.get(0);
+            if (first instanceof Number) {
+                List<Double> vec = new ArrayList<>(response.size());
+                for (Object item : response) {
+                    if (item instanceof Number n) vec.add(n.doubleValue());
+                }
+                return vec;
+            }
+            if (first instanceof List<?> nested) {
+                List<Double> vec = new ArrayList<>(nested.size());
+                for (Object item : nested) {
+                    if (item instanceof Number n) vec.add(n.doubleValue());
+                }
+                return vec;
+            }
+        } catch (Exception e) {
+            log.warn("Remote embedding failed, fallback'a geçiliyor: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Fallback: deterministik hash tabanlı vektör.
+     * Not: Asıl hedef remote embedding; bu sadece servis erişimi olmadığında akışı kırmamak içindir.
+     */
+    private List<Double> fallbackHashEmbedding(String text) {
+        double[] arr = new double[FALLBACK_DIM];
+        String[] tokens = text.split("\\s+");
+        for (String t : tokens) {
+            if (t.isBlank()) continue;
+            int idx = Math.abs(t.hashCode()) % FALLBACK_DIM;
+            arr[idx] += 1.0;
+        }
+        // L2 normalize
+        double norm = 0.0;
+        for (double v : arr) norm += v * v;
+        norm = Math.sqrt(norm);
+        List<Double> result = new ArrayList<>(FALLBACK_DIM);
+        for (double v : arr) {
+            result.add(norm > 0 ? v / norm : 0.0);
+        }
+        return result;
     }
 }

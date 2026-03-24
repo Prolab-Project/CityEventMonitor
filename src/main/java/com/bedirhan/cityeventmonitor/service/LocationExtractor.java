@@ -66,6 +66,12 @@ public class LocationExtractor {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
     );
 
+    // Daha esnek adres kalıpları (kısaltmalar + farklı yazımlar)
+    private static final Pattern ADDRESS_PATTERN_EXTENDED = Pattern.compile(
+            "([\\p{L}0-9\\-\\.\\s']+?(mah\\.?|mahallesi|sok\\.?|sokak|cad\\.?|caddesi|blv\\.?|bulvarı|meydanı|köyü|mevkii))",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+    );
+
     /**
      * Haber metninden ilçe ve mümkün olduğunca spesifik konum bilgisini çıkarmaya çalışır.
      * Konum bulunamazsa district ve locationText null döner.
@@ -79,6 +85,11 @@ public class LocationExtractor {
 
         String district = findDistrict(contentLower);
         String locationText = findLocationText(contentLower);
+
+        // İlçe doğrudan bulunamadıysa, bulunan konum metninin geçtiği bağlamdan ilçe tahmin etmeye çalış
+        if (district == null && locationText != null && !locationText.isBlank()) {
+            district = inferDistrictFromContext(contentLower, locationText);
+        }
 
         // İlçe var ama spesifik yer yoksa geocoding için "İlçe, Kocaeli" kullan (haritada gösterebilmek için)
         if (district != null && (locationText == null || locationText.isBlank())) {
@@ -152,6 +163,30 @@ public class LocationExtractor {
             return matcher.group(1);
         }
 
+        // 3) Genişletilmiş adres pattern'i
+        Matcher extendedMatcher = ADDRESS_PATTERN_EXTENDED.matcher(contentLower);
+        if (extendedMatcher.find()) {
+            return extendedMatcher.group(1);
+        }
+
+        return null;
+    }
+
+    private String inferDistrictFromContext(String contentLower, String locationText) {
+        String loc = locationText.toLowerCase(Locale.forLanguageTag("tr-TR")).trim();
+        int idx = contentLower.indexOf(loc);
+        if (idx < 0) {
+            return null;
+        }
+
+        int start = Math.max(0, idx - 140);
+        int end = Math.min(contentLower.length(), idx + loc.length() + 140);
+        String window = contentLower.substring(start, end);
+
+        String district = findDistrict(window);
+        if (district != null) {
+            return district;
+        }
         return null;
     }
 
