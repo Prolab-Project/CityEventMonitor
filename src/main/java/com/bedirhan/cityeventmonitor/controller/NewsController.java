@@ -36,13 +36,13 @@ public class NewsController {
      */
     @GetMapping
     public PagedResponse<NewsResponseDto> getNews(
-            @RequestParam(required = false) NewsType type,
-            @RequestParam(required = false) String district,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
-            @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(value = "type", required = false) NewsType type,
+            @RequestParam(value = "district", required = false) String district,
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
 
         // Basit rate limiting / güvenlik: sayfa ve boyutu sınırla
         int safePage = Math.max(page, 0);
@@ -57,11 +57,11 @@ public class NewsController {
      */
     @GetMapping("/map")
     public List<NewsResponseDto> getNewsForMap(
-            @RequestParam(required = false) NewsType type,
-            @RequestParam(required = false) String district,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
-            @RequestParam(required = false) String search) {
+            @RequestParam(value = "type", required = false) NewsType type,
+            @RequestParam(value = "district", required = false) String district,
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(value = "search", required = false) String search) {
         return newsService.findFilteredForMap(type, district, startDate, endDate, search);
     }
 
@@ -93,7 +93,7 @@ public class NewsController {
      * Örnek: POST /api/news/scrape?days=3
      */
     @PostMapping("/scrape")
-    public ScrapeResultDto scrape(@RequestParam(defaultValue = "3") int days) {
+    public ScrapeResultDto scrape(@RequestParam(value = "days", defaultValue = "3") int days) {
         return scrapingService.scrapeAllSources(days);
     }
 
