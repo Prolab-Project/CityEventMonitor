@@ -28,15 +28,29 @@ const MARKER_COLORS: Record<NewsType, string> = {
 
 const DEFAULT_MARKER_COLOR = '#6b7280';
 
-function getMarkerIcon(type: NewsType | null): google.maps.Symbol {
+const MARKER_EMOJIS: Record<NewsType, string> = {
+  TRAFIK_KAZASI: '🚗',
+  YANGIN: '🔥',
+  ELEKTRIK_KESINTISI: '⚡',
+  HIRSIZLIK: '🥷',
+  KULTUREL_ETKINLIK: '🎭',
+};
+
+function getMarkerIcon(type: NewsType | null): google.maps.Icon {
   const fillColor = type ? MARKER_COLORS[type] : DEFAULT_MARKER_COLOR;
+  const emoji = type ? MARKER_EMOJIS[type] : '📍';
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+      <circle cx="18" cy="18" r="16" fill="${fillColor}" stroke="#ffffff" stroke-width="2.5" />
+      <text x="50%" y="50%" font-size="18" dominant-baseline="central" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif">${emoji}</text>
+    </svg>
+  `;
+
   return {
-    path: google.maps.SymbolPath.CIRCLE,
-    fillColor,
-    fillOpacity: 1,
-    strokeColor: '#1f2937',
-    strokeWeight: 1.5,
-    scale: 10,
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new window.google.maps.Size(36, 36),
+    anchor: new window.google.maps.Point(18, 18),
   };
 }
 
