@@ -1,10 +1,15 @@
 package com.bedirhan.cityeventmonitor.dto;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 public class ScrapeResultDto {
     private int totalScraped;
     private int newSaved;
     private int duplicatesMerged;
     private int geocodingFailed;
+    /** Kaynak adı → o siteden parse edilen ham haber sayısı (sıra scraper çalışma sırası) */
+    private Map<String, Integer> scrapedBySource = new LinkedHashMap<>();
 
     public ScrapeResultDto() {}
 
@@ -45,5 +50,13 @@ public class ScrapeResultDto {
 
     public void setGeocodingFailed(int geocodingFailed) {
         this.geocodingFailed = geocodingFailed;
+    }
+
+    public Map<String, Integer> getScrapedBySource() {
+        return scrapedBySource;
+    }
+
+    public void setScrapedBySource(Map<String, Integer> scrapedBySource) {
+        this.scrapedBySource = scrapedBySource != null ? scrapedBySource : new LinkedHashMap<>();
     }
 }

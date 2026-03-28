@@ -10,11 +10,16 @@ import com.bedirhan.cityeventmonitor.service.NewsService;
 import com.bedirhan.cityeventmonitor.service.ScrapingService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/news")
@@ -95,6 +100,36 @@ public class NewsController {
     @PostMapping("/scrape")
     public ScrapeResultDto scrape(@RequestParam(value = "days", defaultValue = "3") int days) {
         return scrapingService.scrapeAllSources(days);
+    }
+
+    /**
+     * Sıralı scrape ilerlemesini SSE ile yayınlar (kaynak başında/bitişinde olay).
+     * GET /api/news/scrape/stream?days=3 — EventSource ile dinlenir.
+     */
+    @GetMapping(value = "/scrape/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter scrapeStream(@RequestParam(value = "days", defaultValue = "3") int days) {
+        SseEmitter emitter = new SseEmitter(900_000L);
+        CompletableFuture.runAsync(() -> {
+            try {
+                scrapingService.scrapeAllSources(days, event -> {
+                    try {
+                        emitter.send(SseEmitter.event().name("scrape").data(event, MediaType.APPLICATION_JSON));
+                    } catch (IOException | IllegalStateException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                });
+                emitter.complete();
+            } catch (Exception ex) {
+                try {
+                    emitter.send(SseEmitter.event().name("scrape_error").data(
+                            Map.of("message", ex.getMessage() != null ? ex.getMessage() : "Bilinmeyen hata")));
+                } catch (Exception ignored) {
+                    // bağlantı kapalı olabilir
+                }
+                emitter.completeWithError(ex);
+            }
+        });
+        return emitter;
     }
 
     /**

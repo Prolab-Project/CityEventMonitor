@@ -1,6 +1,7 @@
 package com.bedirhan.cityeventmonitor.service;
 
 import com.bedirhan.cityeventmonitor.controller.CreateNewsRequest;
+import com.bedirhan.cityeventmonitor.dto.ScrapeProgressEventDto;
 import com.bedirhan.cityeventmonitor.dto.ScrapeResultDto;
 import com.bedirhan.cityeventmonitor.model.News;
 import com.bedirhan.cityeventmonitor.model.RawNews;
@@ -11,7 +12,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 @Service
 public class ScrapingService {
@@ -43,19 +47,37 @@ public class ScrapingService {
     }
 
     public ScrapeResultDto scrapeAllSources(int days) {
+        return scrapeAllSources(days, null);
+    }
+
+    /**
+     * @param progress null değilse her kaynak başında/bitişinde ve en sonda SSE ile iletilir
+     */
+    public ScrapeResultDto scrapeAllSources(int days, Consumer<ScrapeProgressEventDto> progress) {
         int totalScraped = 0;
         int newSaved = 0;
         int duplicatesMerged = 0;
         int geocodingFailedCount = 0;
         int actualDays = (days > 0) ? days : defaultDays;
+        Map<String, Integer> perSource = new LinkedHashMap<>();
 
-        logger.info("Starting scrape process for last {} days. Total scrapers: {}", actualDays, scrapers.size());
+        int totalSources = scrapers.size();
+        logger.info("Starting scrape process for last {} days. Total scrapers: {}", actualDays, totalSources);
 
-        for (NewsScraper scraper : scrapers) {
+        for (int idx = 0; idx < totalSources; idx++) {
+            NewsScraper scraper = scrapers.get(idx);
+            String sourceName = scraper.getSourceName();
+            int sourceIndex = idx + 1;
+            if (progress != null) {
+                progress.accept(ScrapeProgressEventDto.sourceStart(sourceName, sourceIndex, totalSources));
+            }
+
+            int extractedThisSource = 0;
             try {
-                logger.info("Running scraper: {}", scraper.getSourceName());
+                logger.info("Running scraper: {}", sourceName);
                 List<RawNews> rawNewsList = scraper.scrape(actualDays);
-                totalScraped += rawNewsList.size();
+                extractedThisSource = rawNewsList.size();
+                totalScraped += extractedThisSource;
 
                 LocalDateTime cutoff = LocalDateTime.now().minusDays(actualDays);
                 for (RawNews raw : rawNewsList) {
@@ -67,19 +89,23 @@ public class ScrapingService {
                         PipelineResult result = processAndSavePipeline(raw);
                         if (result.isGeocodingFailed()) {
                             geocodingFailedCount++;
-                            logger.warn("Geocoding failed for news: {} from source: {}", raw.getTitle(), scraper.getSourceName());
+                            logger.warn("Geocoding failed for news: {} from source: {}", raw.getTitle(), sourceName);
                         } else if (result.isNew()) {
                             newSaved++;
                         } else {
                             duplicatesMerged++;
                         }
                     } catch (Exception ex) {
-                        logger.error("Failed to process RawNews from {}: {}", scraper.getSourceName(), ex.getMessage(), ex);
+                        logger.error("Failed to process RawNews from {}: {}", sourceName, ex.getMessage(), ex);
                     }
                 }
-                logger.info("Scraper '{}' finished. Extracted {} raw items.", scraper.getSourceName(), rawNewsList.size());
+                logger.info("Scraper '{}' finished. Extracted {} raw items.", sourceName, rawNewsList.size());
             } catch (Exception e) {
-                logger.error("Error occurred while scraping with {}: {}", scraper.getSourceName(), e.getMessage());
+                logger.error("Error occurred while scraping with {}: {}", sourceName, e.getMessage());
+            }
+            perSource.put(sourceName, extractedThisSource);
+            if (progress != null) {
+                progress.accept(ScrapeProgressEventDto.sourceDone(sourceName, sourceIndex, totalSources, extractedThisSource));
             }
         }
 
@@ -89,6 +115,10 @@ public class ScrapingService {
         dto.setNewSaved(newSaved);
         dto.setDuplicatesMerged(duplicatesMerged);
         dto.setGeocodingFailed(geocodingFailedCount);
+        dto.setScrapedBySource(perSource);
+        if (progress != null) {
+            progress.accept(ScrapeProgressEventDto.complete(dto));
+        }
         return dto;
     }
 

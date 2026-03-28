@@ -162,6 +162,218 @@
   transform: translateY(0);
 }
 
+/* Filtrele altı — kaynaklardan çek (ikincil aksiyon, profesyonel kart görünümü) */
+.filter-scrape-section {
+  margin-top: 1.35rem;
+  padding-top: 1.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.filter-scrape-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.filter-scrape-hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.filter-scrape-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  min-height: 48px;
+  padding: 0.75rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: linear-gradient(
+    165deg,
+    rgba(30, 58, 138, 0.35) 0%,
+    rgba(15, 23, 42, 0.92) 45%,
+    rgba(15, 23, 42, 0.98) 100%
+  );
+  color: #e2e8f0;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 8px 24px rgba(0, 0, 0, 0.35);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    filter 0.2s ease;
+}
+
+.filter-scrape-btn:hover:not(:disabled) {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #f8fafc;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 0 0 1px rgba(16, 185, 129, 0.15),
+    0 12px 32px rgba(0, 0, 0, 0.45);
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.filter-scrape-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.filter-scrape-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+.filter-scrape-btn__icon {
+  display: flex;
+  color: #7dd3fc;
+  flex-shrink: 0;
+}
+
+.filter-scrape-btn:hover:not(:disabled) .filter-scrape-btn__icon {
+  color: #6ee7b7;
+}
+
+.filter-scrape-btn__text {
+  text-align: center;
+}
+
+/* Filtre paneli altı: canlı sayılar + son çekim kaynak çubuğu */
+.news-fetch-stats-bar {
+  position: relative;
+  margin-top: 1.25rem;
+  padding: 1rem 1rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.news-fetch-stats-bar__live {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.news-fetch-stats-bar__live-done {
+  list-style: none;
+  margin: 0 0 0.65rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.news-fetch-stats-bar__live-done li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+}
+
+.news-fetch-stats-bar__live-check {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.news-fetch-stats-bar__live-muted strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.news-fetch-stats-bar__live-current {
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.news-fetch-stats-bar__row--live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+}
+
+.news-fetch-stats-bar__sep {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  align-self: center;
+}
+
+.news-fetch-stats-bar__row--meta {
+  margin-top: 0.75rem;
+}
+
+.news-fetch-stats-bar__track {
+  display: flex;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 0.65rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.news-fetch-stats-bar__segment {
+  min-width: 0;
+  height: 100%;
+  transition: width 0.35s ease;
+}
+
+.news-fetch-stats-bar__legend {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.news-fetch-stats-bar__legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.news-fetch-stats-bar__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.news-fetch-stats-bar__legend-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.news-fetch-stats-bar__legend-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .content-panel {
   display: flex;
   flex-direction: column;
@@ -205,45 +417,234 @@
   height: calc(100vh - 180px);
 }
 
+/* Harita InfoWindow — uygulama ile uyumlu koyu kart */
 .map-infowindow {
-  min-width: 240px;
-  color: #1f2937;
-  font-family: 'Inter', sans-serif;
-  padding: 0.25rem;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 0;
+  margin: 0;
 }
 
-.map-infowindow h3 {
-  margin: 0 0 0.75rem;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #111827;
+.map-infowindow--card {
+  position: relative;
+  min-width: 288px;
+  max-width: 380px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(
+    160deg,
+    rgba(15, 23, 42, 0.98) 0%,
+    rgba(30, 41, 59, 0.97) 50%,
+    rgba(15, 23, 42, 0.98) 100%
+  );
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.15),
+    0 24px 48px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-.map-infowindow p {
-  margin: 0.4rem 0;
-  font-size: 0.9rem;
-  color: #4b5563;
-  line-height: 1.4;
+.map-infowindow__accent {
+  height: 4px;
+  width: 100%;
 }
 
-.map-infowindow-links {
+.map-infowindow__body {
+  position: relative;
+  padding: 14px 40px 16px 16px;
+}
+
+.map-infowindow__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  font-size: 1.35rem;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.map-infowindow__close:hover {
+  background: rgba(51, 65, 85, 0.95);
+  color: #fff;
+  border-color: rgba(148, 163, 184, 0.55);
+}
+
+.map-infowindow__row--top {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.75rem !important;
-  padding-top: 0.5rem;
-  border-top: 1px solid #e5e7eb;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.map-infowindow-links a {
-  color: var(--accent-primary-hover);
-  text-decoration: none;
+.map-infowindow__type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.map-infowindow__type-emoji {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.map-infowindow__district-pill {
+  font-size: 0.78rem;
   font-weight: 600;
-  font-size: 0.85rem;
+  color: #94a3b8;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.map-infowindow-links a:hover {
-  text-decoration: underline;
+.map-infowindow__title {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.38;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.map-infowindow__details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0 4px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.map-infowindow__detail {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: start;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.map-infowindow__detail-label {
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.68rem;
+  padding-top: 2px;
+}
+
+.map-infowindow__detail-value {
+  color: #cbd5e1;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.map-infowindow__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.map-infowindow__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 11px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: #fff !important;
+  background: linear-gradient(135deg, #10b981 0%, #059669 55%, #047857 100%);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.map-infowindow__btn:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+  transform: translateY(-1px);
+}
+
+.map-infowindow__btn-arrow {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+/*
+ * Google Maps InfoWindow — API’nin beyaz balonunu kaldır; sadece .map-infowindow--card görünsün
+ * (sınıflar Maps sürümüne göre değişebilir; birkaç üst sarmalayıcı hedeflenir.)
+ */
+.map-container .gm-style .gm-style-iw {
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.map-container .gm-style .gm-style-iw-c {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  max-width: none !important;
+}
+
+.map-container .gm-style .gm-style-iw-d {
+  background: transparent !important;
+  overflow: hidden !important;
+  max-height: none !important;
+  padding: 0 !important;
+}
+
+/* Üst şerit / kapatma satırı — beyaz şeridi kaldır */
+.map-container .gm-style .gm-style-iw-chr {
+  background: transparent !important;
+  box-shadow: none !important;
+  height: auto !important;
+}
+
+.map-container .gm-style .gm-style-iw-tc {
+  background: transparent !important;
+}
+
+.map-container .gm-style .gm-style-iw-t {
+  background: transparent !important;
+}
+
+/* Haritaya bakan üçgen kuyruk — koyu tona yaklaştır */
+.map-container .gm-style .gm-style-iw-tc::after,
+.map-container .gm-style .gm-style-iw-t::after {
+  background: #1e293b !important;
+  box-shadow: none !important;
 }
 
 .news-list-root {

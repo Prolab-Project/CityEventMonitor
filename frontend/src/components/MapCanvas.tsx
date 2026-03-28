@@ -36,6 +36,111 @@ const MARKER_EMOJIS: Record<NewsType, string> = {
   KULTUREL_ETKINLIK: '🎭',
 };
 
+const TYPE_LABELS_TR: Record<NewsType, string> = {
+  TRAFIK_KAZASI: 'Trafik kazası',
+  YANGIN: 'Yangın',
+  ELEKTRIK_KESINTISI: 'Elektrik kesintisi',
+  HIRSIZLIK: 'Hırsızlık / güvenlik',
+  KULTUREL_ETKINLIK: 'Kültürel etkinlik',
+};
+
+function getTypePresentation(type: NewsType | null): { label: string; color: string; emoji: string } {
+  if (!type) {
+    return { label: 'Tür belirtilmemiş', color: DEFAULT_MARKER_COLOR, emoji: '📰' };
+  }
+  return {
+    label: TYPE_LABELS_TR[type],
+    color: MARKER_COLORS[type],
+    emoji: MARKER_EMOJIS[type],
+  };
+}
+
+function MapInfoPanel({ news, onClose }: { news: DisplayNews; onClose: () => void }) {
+  const tp = getTypePresentation(news.type);
+  const when = new Date(news.publishDate).toLocaleString('tr-TR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  return (
+    <div className="map-infowindow map-infowindow--card">
+      <div className="map-infowindow__accent" style={{ background: tp.color }} aria-hidden />
+      <div className="map-infowindow__body">
+        <button
+          type="button"
+          className="map-infowindow__close"
+          onClick={onClose}
+          aria-label="Kapat"
+        >
+          ×
+        </button>
+        <div className="map-infowindow__row map-infowindow__row--top">
+          <span
+            className="map-infowindow__type-chip"
+            style={{
+              borderColor: `${tp.color}66`,
+              background: `${tp.color}22`,
+              color: '#f8fafc',
+            }}
+          >
+            <span className="map-infowindow__type-emoji" aria-hidden>
+              {tp.emoji}
+            </span>
+            {tp.label}
+          </span>
+          <span className="map-infowindow__district-pill">
+            {news.district?.trim() || 'İlçe yok'}
+          </span>
+        </div>
+
+        <h3 className="map-infowindow__title">{news.title}</h3>
+
+        <div className="map-infowindow__details">
+          {news.locationText ? (
+            <div className="map-infowindow__detail">
+              <span className="map-infowindow__detail-label">Konum</span>
+              <span className="map-infowindow__detail-value">{news.locationText}</span>
+            </div>
+          ) : null}
+          <div className="map-infowindow__detail">
+            <span className="map-infowindow__detail-label">Yayın</span>
+            <span className="map-infowindow__detail-value">{when}</span>
+          </div>
+          {news.sources.length > 0 ? (
+            <div className="map-infowindow__detail">
+              <span className="map-infowindow__detail-label">Kaynak</span>
+              <span className="map-infowindow__detail-value">{news.sources.join(' · ')}</span>
+            </div>
+          ) : null}
+        </div>
+
+        {news.urls.length > 0 ? (
+          <div className="map-infowindow__actions">
+            {news.urls.map((url, i) => (
+              <a
+                key={i}
+                className="map-infowindow__btn"
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Orijinal habere git
+                {news.urls.length > 1 ? ` (${i + 1})` : ''}
+                <span className="map-infowindow__btn-arrow" aria-hidden>
+                  ↗
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function getMarkerIcon(type: NewsType | null): google.maps.Icon {
   const fillColor = type ? MARKER_COLORS[type] : DEFAULT_MARKER_COLOR;
   const emoji = type ? MARKER_EMOJIS[type] : '📍';
@@ -141,39 +246,9 @@ export default function MapCanvas({ news }: MapCanvasProps) {
         <InfoWindow
           position={{ lat: selectedNews.displayLat, lng: selectedNews.displayLng }}
           onCloseClick={() => setSelectedId(null)}
+          options={{ headerDisabled: true }}
         >
-          <div className="map-infowindow">
-            <h3>{selectedNews.title}</h3>
-            <p>{selectedNews.district ?? 'İlçe bilgisi yok'}</p>
-            {selectedNews.locationText && (
-              <p>
-                <strong>Konum:</strong> {selectedNews.locationText}
-              </p>
-            )}
-            <p>
-              {new Date(selectedNews.publishDate).toLocaleString('tr-TR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </p>
-            {selectedNews.sources.length > 0 && (
-              <p>
-                <strong>Kaynak:</strong> {selectedNews.sources.join(', ')}
-              </p>
-            )}
-            {selectedNews.urls.length > 0 && (
-              <p className="map-infowindow-links">
-                {selectedNews.urls.map((url, i) => (
-                  <a key={i} href={url} target="_blank" rel="noreferrer">
-                    Habere git{selectedNews.urls.length > 1 ? ` (${i + 1})` : ''}
-                  </a>
-                ))}
-              </p>
-            )}
-          </div>
+          <MapInfoPanel news={selectedNews} onClose={() => setSelectedId(null)} />
         </InfoWindow>
       )}
     </GoogleMap>

@@ -1,5 +1,12 @@
 import './App.css';
 import { useState, useEffect, useCallback } from 'react';
+import dayjs from 'dayjs';
+import 'dayjs/locale/tr';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { trTR } from '@mui/x-date-pickers/locales';
+
+dayjs.locale('tr');
 import type { Filters } from './types/filters';
 import type { News } from './types/news';
 import type { PagedResponse } from './types/paged-response';
@@ -7,7 +14,14 @@ import type { FilterState } from './components/FilterPanel';
 import FilterPanel from './components/FilterPanel';
 import NewsList from './components/NewsList';
 import MapCanvas from './components/MapCanvas';
-import { getFilters, getMapNews, getNews } from './api/newsApi';
+import NewsFetchStatsBar from './components/NewsFetchStatsBar';
+import {
+  getFilters,
+  getMapNews,
+  getNews,
+  triggerScrapeStream,
+  type ScrapeResult,
+} from './api/newsApi';
 import { 
   CircularProgress, 
   Alert, 
@@ -23,6 +37,11 @@ const theme = createTheme({
     primary: {
       main: '#22c55e',
     },
+  },
+  typography: {
+    // Varsayılan MUI "Roboto" ailesi Google Fonts isteği tetikleyebilir; sistem fontu = ek ağ yok
+    fontFamily:
+      'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });
 
@@ -42,7 +61,19 @@ function App() {
   const [size] = useState(20);
   
   const [isLoading, setIsLoading] = useState(false);
+  /** Uzun süren /news/scrape; tam ekran Backdrop ile karıştırılmaz */
+  const [scrapeLoading, setScrapeLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastScrape, setLastScrape] = useState<ScrapeResult | null>(null);
+  const [lastScrapeAt, setLastScrapeAt] = useState<number | null>(null);
+  const [totalInDatabase, setTotalInDatabase] = useState<number | null>(null);
+  /** SSE ile anlık kaynak sırası (gösterge çubuğu) */
+  const [scrapeLive, setScrapeLive] = useState<{
+    currentSource: string | null;
+    currentIndex: number;
+    totalSources: number;
+    completed: { sourceName: string; extractedCount: number }[];
+  } | null>(null);
 
   // Fetch filter metadata on mount
   useEffect(() => {
@@ -64,16 +95,20 @@ function App() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await getNews({
-        type: appliedFilters.type || undefined,
-        district: appliedFilters.district || undefined,
-        startDate: toStartOfDay(appliedFilters.startDate),
-        endDate: toEndOfDay(appliedFilters.endDate),
-        search: appliedFilters.search || undefined,
-        page,
-        size,
-      });
+      const [response, dbHead] = await Promise.all([
+        getNews({
+          type: appliedFilters.type || undefined,
+          district: appliedFilters.district || undefined,
+          startDate: toStartOfDay(appliedFilters.startDate),
+          endDate: toEndOfDay(appliedFilters.endDate),
+          search: appliedFilters.search || undefined,
+          page,
+          size,
+        }),
+        getNews({ page: 0, size: 1 }),
+      ]);
       setNewsPage(response);
+      setTotalInDatabase(dbHead.totalElements);
 
       // Harita sayfalamadan bağımsız çalışmalı; filtreye uyan tüm haberleri al.
       const mapItems = await getMapNews({
@@ -96,6 +131,65 @@ function App() {
     fetchNews();
   }, [fetchNews]);
 
+  const handleRefreshAllNews = async () => {
+    setError(null);
+    setScrapeLoading(true);
+    setScrapeLive({
+      currentSource: null,
+      currentIndex: 0,
+      totalSources: 0,
+      completed: [],
+    });
+    try {
+      const scrapeResult = await triggerScrapeStream(3, (ev) => {
+        if (ev.phase === 'SOURCE_START' && ev.sourceName && ev.sourceIndex && ev.sourceTotal) {
+          setScrapeLive((prev) => ({
+            currentSource: ev.sourceName!,
+            currentIndex: ev.sourceIndex!,
+            totalSources: ev.sourceTotal!,
+            completed: prev?.completed ?? [],
+          }));
+          return;
+        }
+        if (ev.phase === 'SOURCE_DONE' && ev.sourceName != null && ev.sourceIndex && ev.sourceTotal) {
+          const count = ev.extractedCount ?? 0;
+          setScrapeLive((prev) => ({
+            currentSource: null,
+            currentIndex: ev.sourceIndex!,
+            totalSources: ev.sourceTotal!,
+            completed: [
+              ...(prev?.completed ?? []),
+              { sourceName: ev.sourceName!, extractedCount: count },
+            ],
+          }));
+        }
+      });
+      setLastScrape(scrapeResult);
+      setLastScrapeAt(Date.now());
+      const bySource = scrapeResult.scrapedBySource ?? {};
+      console.log(
+        '[Scrape] Özet — toplam çekilen (ham):',
+        scrapeResult.totalScraped,
+        '| yeni:',
+        scrapeResult.newSaved,
+        '| mükerrer:',
+        scrapeResult.duplicatesMerged,
+        '| geocoding hata:',
+        scrapeResult.geocodingFailed,
+      );
+      console.log('[Scrape] Kaynak bazlı çekilen haber sayıları:');
+      console.table(bySource);
+    } catch (err: any) {
+      console.error('Error refreshing news:', err);
+      setError('Haberleri yeniden çekme sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+      return;
+    } finally {
+      setScrapeLoading(false);
+      setScrapeLive(null);
+    }
+    await fetchNews();
+  };
+
   const handleFilterChange = (next: FilterState) => {
     setFilterState(next);
   };
@@ -112,6 +206,11 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
+      <LocalizationProvider
+        dateAdapter={AdapterDayjs}
+        adapterLocale="tr"
+        localeText={trTR.components.MuiLocalizationProvider.defaultProps.localeText}
+      >
       <div className="app-root">
         <header className="app-header">
           <h1>City Event Monitor</h1>
@@ -127,9 +226,66 @@ function App() {
               onChange={handleFilterChange}
               onSubmit={handleFilterSubmit}
             />
+            <div className="filter-scrape-section">
+              <p className="filter-scrape-label">Veri kaynakları</p>
+              <p className="filter-scrape-hint">
+                Beş haber sitesinden son günlerin içeriğini çeker; işlem birkaç dakika sürebilir.
+              </p>
+              <button
+                type="button"
+                className="filter-scrape-btn"
+                disabled={isLoading || scrapeLoading}
+                onClick={handleRefreshAllNews}
+              >
+                {scrapeLoading ? (
+                  <>
+                    <CircularProgress size={20} thickness={5} sx={{ color: '#6ee7b7' }} />
+                    <span>Kaynaklar çekiliyor…</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="filter-scrape-btn__icon" aria-hidden>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                          d="M4 4v6h6M20 20v-6h-6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M5 19a9 9 0 0 0 14.65-3.5M19 5a9 9 0 0 0-14.65 3.5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    <span className="filter-scrape-btn__text">Haberleri kaynaklardan yenile</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <NewsFetchStatsBar
+              filteredTotal={newsPage?.totalElements ?? 0}
+              totalInDatabase={totalInDatabase}
+              lastScrape={lastScrape}
+              lastScrapeAt={lastScrapeAt}
+              scrapeLoading={scrapeLoading}
+              scrapeLive={scrapeLive}
+            />
           </section>
 
           <section className="content-panel">
+            {scrapeLoading && (
+              <Box mb={2}>
+                <Alert severity="info">
+                  Kaynak sitelerden veri alınıyor (birkaç dakika sürebilir). Bu sırada liste ve harita
+                  kullanılabilir; işlem bitince güncellenir.
+                </Alert>
+              </Box>
+            )}
             {error && (
               <Box mb={2}>
                 <Alert severity="error" onClose={() => setError(null)}>
@@ -165,6 +321,7 @@ function App() {
           <CircularProgress color="inherit" />
         </Backdrop>
       </div>
+      </LocalizationProvider>
     </ThemeProvider>
   );
 }

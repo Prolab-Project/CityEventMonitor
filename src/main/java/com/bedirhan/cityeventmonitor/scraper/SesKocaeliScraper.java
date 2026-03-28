@@ -1,7 +1,6 @@
 package com.bedirhan.cityeventmonitor.scraper;
 
 import com.bedirhan.cityeventmonitor.model.RawNews;
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -18,22 +17,26 @@ public class SesKocaeliScraper implements NewsScraper {
 
     private static final Logger log = LoggerFactory.getLogger(SesKocaeliScraper.class);
     private static final String BASE_URL = "https://www.seskocaeli.com";
-    private static final int MAX_DETAIL_PAGES = 25;
     private static final int DELAY_MS = 400;
+
+    private final ScraperRuntimeConfig scraperLimits;
+
+    public SesKocaeliScraper(ScraperRuntimeConfig scraperLimits) {
+        this.scraperLimits = scraperLimits;
+    }
 
     @Override
     public List<RawNews> scrape(int days) {
         List<RawNews> results = new ArrayList<>();
 
         try {
-            Document doc = Jsoup.connect(BASE_URL)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .get();
+            Document doc = ScraperHttp.connect(BASE_URL).get();
 
             Elements links = doc.select("a[href*=\"/haber/\"]");
+            int maxLinks = scraperLimits.getMaxDetailPagesPerSource();
             int count = 0;
             for (Element link : links) {
-                if (count >= MAX_DETAIL_PAGES) break;
+                if (count >= maxLinks) break;
 
                 RawNews raw = buildFromListLink(link);
                 if (raw == null) continue;
@@ -77,9 +80,7 @@ public class SesKocaeliScraper implements NewsScraper {
 
     private void fetchDetailPage(RawNews raw) {
         try {
-            Document detail = Jsoup.connect(raw.getUrl())
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .get();
+            Document detail = ScraperHttp.connect(raw.getUrl()).get();
 
             String content = DetailPageHelper.extractContent(detail);
             if (content != null && !content.isBlank()) {
