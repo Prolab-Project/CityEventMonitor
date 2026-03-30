@@ -175,17 +175,39 @@ public class NewsService {
             News existing = duplicate.get();
             boolean updated = false;
             if (request.getSource() != null && !request.getSource().isBlank()) {
-                if(existing.getSources().add(request.getSource())) updated = true;
+                if (existing.getSources().add(request.getSource())) updated = true;
             }
             if (request.getUrl() != null && !request.getUrl().isBlank()) {
-                if(existing.getUrls().add(request.getUrl())) updated = true;
+                if (existing.getUrls().add(request.getUrl())) updated = true;
             }
+
+            // Aynı URL tekrar scrape edildiğinde (ör. yanlış liste başlığı düzelmişse) başlık/içerik güncelle
+            String reqUrl = request.getUrl() != null ? request.getUrl().trim() : "";
+            if (!reqUrl.isBlank() && existing.getUrls().contains(reqUrl)) {
+                if (request.getTitle() != null && !request.getTitle().isBlank()
+                        && !request.getTitle().equals(existing.getTitle())) {
+                    existing.setTitle(request.getTitle());
+                    updated = true;
+                }
+                if (request.getContent() != null && !request.getContent().isBlank()) {
+                    String exContent = existing.getContent() != null ? existing.getContent() : "";
+                    if (request.getContent().length() > exContent.length()) {
+                        existing.setContent(request.getContent());
+                        updated = true;
+                    }
+                }
+                if (request.getType() != null && request.getType() != existing.getType()) {
+                    existing.setType(request.getType());
+                    updated = true;
+                }
+            }
+
             if (updated) {
-                logger.info("Duplicate found for URL/Title. Sources/URLs updated for document id: {}", existing.getId());
+                logger.info("Duplicate merge: güncellenen belge id={}", existing.getId());
                 return newsRepository.save(existing);
             }
-            logger.debug("Duplicate found but no new sources/URLs to attach. Ignoring.");
-            return existing; // Aynı ekleme işlemi yapılmadıysa direkt dön
+            logger.debug("Duplicate found but no fields to update. Ignoring.");
+            return existing;
         }
 
         // 2) Yeni Kayıt — Geocoding: Konum metni varsa koordinat gerekli; başarısızsa kayıt işlenmez

@@ -16,7 +16,7 @@ import java.util.List;
 public class YeniKocaeliScraper implements NewsScraper {
 
     private static final Logger log = LoggerFactory.getLogger(YeniKocaeliScraper.class);
-    private static final String BASE_URL = "https://yenikocaeli.com";
+    private static final String BASE_URL = "https://www.yenikocaeli.com";
     private static final int DELAY_MS = 400;
 
     private final ScraperRuntimeConfig scraperLimits;
@@ -32,7 +32,10 @@ public class YeniKocaeliScraper implements NewsScraper {
         try {
             Document doc = ScraperHttp.connect(BASE_URL).get();
 
-            Elements links = doc.select("a[href*=\"/haber/\"]");
+            // Ana sayfada haber linkleri bazen `href="/haber/..."`,
+            // bazen `href="haber/..."` (başında `/` yok) şeklinde gelebiliyor.
+            // Fragment/tag linkleri ise `#...` içerdiği için ayrı filtreyle atıyoruz.
+            Elements links = doc.select("a[href*=\"haber/\"]");
             int maxLinks = scraperLimits.getMaxDetailPagesPerSource();
             int count = 0;
             for (Element link : links) {
@@ -64,7 +67,20 @@ public class YeniKocaeliScraper implements NewsScraper {
         String href = link.attr("href");
         if (href == null || href.isBlank()) return null;
 
-        String url = href.startsWith("http") ? href : BASE_URL + href;
+        // Ana sayfada "haber" kategorisi/etiketleri de linklenebiliyor.
+        // Bunlar genelde `.../haber/#...` fragment içerdiği için gerçek haber detayına gitmez.
+        if (href.contains("#")) return null;
+        if (!href.contains("haber/")) return null;
+        if (!href.endsWith(".html")) return null;
+
+        String url;
+        if (href.startsWith("http")) {
+            url = href;
+        } else {
+            // Göreli linkte başta `/` olmayabiliyor: `haber/...` -> `https://.../haber/...`
+            String normalizedHref = href.startsWith("/") ? href : "/" + href;
+            url = BASE_URL + normalizedHref;
+        }
         String title = link.attr("title");
         if (title == null || title.isBlank()) title = link.text();
         if (title == null || title.isBlank()) return null;
@@ -81,6 +97,11 @@ public class YeniKocaeliScraper implements NewsScraper {
     private void fetchDetailPage(RawNews raw) {
         try {
             Document detail = ScraperHttp.connect(raw.getUrl()).get();
+
+            String title = DetailPageHelper.extractTitle(detail);
+            if (title != null && !title.isBlank()) {
+                raw.setTitle(title);
+            }
 
             String content = DetailPageHelper.extractContent(detail);
             if (content != null && !content.isBlank()) raw.setContent(content);

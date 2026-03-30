@@ -14,16 +14,25 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @RestController
 @RequestMapping("/api/news")
 public class NewsController {
+
+    private static final Logger logger = LoggerFactory.getLogger(NewsController.class);
 
     private final NewsService newsService;
     private final ScrapingService scrapingService;
@@ -110,15 +119,33 @@ public class NewsController {
     public SseEmitter scrapeStream(@RequestParam(value = "days", defaultValue = "3") int days) {
         SseEmitter emitter = new SseEmitter(900_000L);
         CompletableFuture.runAsync(() -> {
+            AtomicBoolean canSend = new AtomicBoolean(true);
+            ScheduledExecutorService scheduler = null;
+            ScheduledFuture<?> pingTask = null;
             try {
+                // Bazı ortamlar SSE akışı "sessiz" kaldığında bağlantıyı kesebiliyor.
+                // Bu yüzden periyodik ping gönderiyoruz (frontend'de yakalanmayan event adı: ping).
+                scheduler = Executors.newSingleThreadScheduledExecutor();
+                pingTask = scheduler.scheduleAtFixedRate(() -> {
+                    if (!canSend.get()) return;
+                    try {
+                        emitter.send(SseEmitter.event().name("ping").data("ping"));
+                    } catch (Exception ex) {
+                        canSend.set(false);
+                        logger.warn("SSE ping gönderimi başarısız, durduruluyor: {}", ex.getMessage());
+                    }
+                }, 20, 20, TimeUnit.SECONDS);
+
                 scrapingService.scrapeAllSources(days, event -> {
+                    if (!canSend.get()) return;
                     try {
                         emitter.send(SseEmitter.event().name("scrape").data(event, MediaType.APPLICATION_JSON));
                     } catch (IOException | IllegalStateException ex) {
-                        throw new RuntimeException(ex);
+                        // İstemci kopmuş olabilir; stream'i patlatmadan göndermeyi durdur.
+                        canSend.set(false);
+                        logger.warn("SSE gönderimi başarısız, stream durduruluyor: {}", ex.getMessage());
                     }
                 });
-                emitter.complete();
             } catch (Exception ex) {
                 try {
                     emitter.send(SseEmitter.event().name("scrape_error").data(
@@ -127,6 +154,24 @@ public class NewsController {
                     // bağlantı kapalı olabilir
                 }
                 emitter.completeWithError(ex);
+            } finally {
+                if (pingTask != null) {
+                    try {
+                        pingTask.cancel(true);
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (scheduler != null) {
+                    try {
+                        scheduler.shutdownNow();
+                    } catch (Exception ignored) {
+                    }
+                }
+                try {
+                    emitter.complete();
+                } catch (Exception ignored) {
+                    // complete() çoktan tamamlanmışsa ignore
+                }
             }
         });
         return emitter;

@@ -82,6 +82,11 @@ public class OzgurKocaeliScraper implements NewsScraper {
         try {
             Document detail = ScraperHttp.connect(raw.getUrl()).get();
 
+            String title = DetailPageHelper.extractTitle(detail);
+            if (title != null && !title.isBlank()) {
+                raw.setTitle(title);
+            }
+
             String content = DetailPageHelper.extractContent(detail);
             if (content != null && !content.isBlank()) {
                 raw.setContent(content);

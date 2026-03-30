@@ -2,6 +2,7 @@ package com.bedirhan.cityeventmonitor.scraper;
 
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
 
 /**
@@ -21,7 +22,59 @@ public final class DetailPageHelper {
             ".news-date", ".post-date", "meta[property=article:published_time]"
     };
 
+    private static final String[] TITLE_SELECTORS = {
+            "h1[itemprop=headline]",
+            ".haber-baslik h1", ".haber-baslik", ".news-title", ".article-title", ".post-title",
+            "article h1", "main h1", ".entry-title", "[itemprop=headline]",
+            "h1"
+    };
+
     private DetailPageHelper() {
+    }
+
+    /**
+     * Haber detayından manşet; liste sayfasındaki yanlış/misafir kategori metninin üzerine yazılır.
+     */
+    public static String extractTitle(Document doc) {
+        Elements og = doc.select("meta[property=og:title]");
+        if (!og.isEmpty()) {
+            String c = og.first().attr("content");
+            if (isUsableTitle(c)) {
+                return normalizeTitle(Parser.unescapeEntities(c, true));
+            }
+        }
+        Elements tw = doc.select("meta[name=twitter:title]");
+        if (!tw.isEmpty()) {
+            String c = tw.first().attr("content");
+            if (isUsableTitle(c)) {
+                return normalizeTitle(Parser.unescapeEntities(c, true));
+            }
+        }
+        for (String selector : TITLE_SELECTORS) {
+            try {
+                Elements els = doc.select(selector);
+                if (els.isEmpty()) continue;
+                for (Element el : els) {
+                    String text = el.text();
+                    if (isUsableTitle(text)) {
+                        return normalizeTitle(text.trim());
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static boolean isUsableTitle(String s) {
+        if (s == null) return false;
+        String t = s.trim();
+        return t.length() >= 8;
+    }
+
+    private static String normalizeTitle(String s) {
+        if (s == null) return null;
+        return s.replace('\u00a0', ' ').trim().replaceAll("\\s+", " ");
     }
 
     /**

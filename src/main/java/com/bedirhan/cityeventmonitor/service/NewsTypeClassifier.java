@@ -67,10 +67,14 @@ public class NewsTypeClassifier {
         ));
 
         positiveContextMap.put(NewsType.ELEKTRIK_KESINTISI, List.of(
-                "elektrik", "enerji", "şebeke", "trafo", "sedaş", "planlı", "bakım", "hat", "gerilim"
+                // Not: "hat" ve "enerji" gibi tek kelimeler yanlış pozitif üretebiliyor.
+                // Örn: "Alo 187 hattına" (hat), "enerjik" (enerji substringi) vb.
+                // Bu yüzden daha spesifik sinyallere ağırlık veriyoruz.
+                "elektrik", "şebeke", "trafo", "sedaş", "planlı", "bakım", "gerilim"
         ));
         negativeContextMap.put(NewsType.ELEKTRIK_KESINTISI, List.of(
-                "transfer", "oyuncu", "kocaelispor", "festival", "konser", "hırsızlık"
+                "transfer", "oyuncu", "kocaelispor", "festival", "konser", "hırsızlık",
+                "alo", "187"
         ));
 
         positiveContextMap.put(NewsType.HIRSIZLIK, List.of(
