@@ -94,8 +94,21 @@ export function triggerScrapeStream(
     });
 
     es.onerror = () => {
-      if (settled) return;
-      fail(new Error('SSE bağlantısı kesildi veya sunucuya ulaşılamadı.'));
+      // EventSource, sunucu bağlantıyı kapatınca (emitter.complete()) da onerror tetikler.
+      // 'settled' true ise COMPLETE olayı zaten alınmıştır — bu durumda hata değil, normal kapanıştır.
+      if (settled) {
+        es.close();
+        return;
+      }
+      // readyState === 2 (CLOSED) ise sunucu bağlantıyı kapattı ama COMPLETE gelmedi → gerçek hata.
+      // readyState === 0 (CONNECTING) ise tarayıcı yeniden bağlanmaya çalışıyor → bekle, hemen hata verme.
+      if (es.readyState === EventSource.CLOSED) {
+        fail(new Error('SSE bağlantısı kesildi veya sunucuya ulaşılamadı.'));
+      }
+      // CONNECTING durumunda EventSource otomatik yeniden bağlanır; bunu engellemek için kapat.
+      if (es.readyState === EventSource.CONNECTING) {
+        fail(new Error('SSE bağlantısı kesildi veya sunucuya ulaşılamadı.'));
+      }
     };
   });
 }

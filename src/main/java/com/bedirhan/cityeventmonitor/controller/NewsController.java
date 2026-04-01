@@ -6,8 +6,7 @@ import com.bedirhan.cityeventmonitor.dto.PagedResponse;
 import com.bedirhan.cityeventmonitor.dto.ScrapeResultDto;
 import com.bedirhan.cityeventmonitor.model.News;
 import com.bedirhan.cityeventmonitor.model.NewsType;
-import com.bedirhan.cityeventmonitor.service.NewsService;
-import com.bedirhan.cityeventmonitor.service.ScrapingService;
+import com.bedirhan.cityeventmonitor.service.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -27,10 +26,19 @@ public class NewsController {
 
     private final NewsService newsService;
     private final ScrapingService scrapingService;
+    private final NewsTypeClassifier newsTypeClassifier;
+    private final LocationExtractor locationExtractor;
+    private final TextPreprocessor textPreprocessor;
 
-    public NewsController(NewsService newsService, ScrapingService scrapingService) {
+    public NewsController(NewsService newsService, ScrapingService scrapingService,
+                          NewsTypeClassifier newsTypeClassifier,
+                          LocationExtractor locationExtractor,
+                          TextPreprocessor textPreprocessor) {
         this.newsService = newsService;
         this.scrapingService = scrapingService;
+        this.newsTypeClassifier = newsTypeClassifier;
+        this.locationExtractor = locationExtractor;
+        this.textPreprocessor = textPreprocessor;
     }
 
     /**
@@ -105,10 +113,32 @@ public class NewsController {
     /**
      * Sıralı scrape ilerlemesini SSE ile yayınlar (kaynak başında/bitişinde olay).
      * GET /api/news/scrape/stream?days=3 — EventSource ile dinlenir.
+     *
+     * Heartbeat: Scraping uzun sürebileceğinden (5 kaynak × yüzlerce detay sayfası),
+     * her 10 saniyede bir SSE comment gönderilir; böylece proxy/tarayıcı
+     * bağlantıyı "idle" kabul edip kesmez.
      */
     @GetMapping(value = "/scrape/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter scrapeStream(@RequestParam(value = "days", defaultValue = "3") int days) {
-        SseEmitter emitter = new SseEmitter(900_000L);
+        SseEmitter emitter = new SseEmitter(0L); // Sınırsız süre (Timeout yok)
+
+        // Heartbeat: bağlantıyı canlı tutmak için periyodik SSE comment gönderir
+        java.util.concurrent.ScheduledExecutorService heartbeat =
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        heartbeat.scheduleAtFixedRate(() -> {
+            try {
+                emitter.send(SseEmitter.event().comment("heartbeat"));
+            } catch (Exception ignored) {
+                // bağlantı zaten kapanmışsa sessizce geç
+                heartbeat.shutdown();
+            }
+        }, 10, 10, java.util.concurrent.TimeUnit.SECONDS);
+
+        // Temizlik: emitter herhangi bir nedenle biterse heartbeat'i durdur
+        emitter.onCompletion(heartbeat::shutdown);
+        emitter.onTimeout(heartbeat::shutdown);
+        emitter.onError(e -> heartbeat.shutdown());
+
         CompletableFuture.runAsync(() -> {
             try {
                 scrapingService.scrapeAllSources(days, event -> {
@@ -141,5 +171,90 @@ public class NewsController {
     public java.util.Map<String, Integer> reprocess() {
         int updated = newsService.reprocessAllNews();
         return java.util.Map.of("updated", updated);
+    }
+
+    /**
+     * Sınıflandırma ve konum çıkarma test endpoint'i.
+     * Scrape yapmadan herhangi bir metni pipeline'dan geçirir ve sonucu döner.
+     *
+     * Kullanım:
+     *   POST /api/news/classify
+     *   Body: { "text": "Gebze'de trafik kazası: 3 araç çarpıştı" }
+     *
+     * Yanıt:
+     *   { "type": "TRAFIK_KAZASI", "district": "Gebze", "locationText": "Gebze" }
+     */
+    @PostMapping("/classify")
+    public Map<String, Object> classifyText(@RequestBody Map<String, String> body) {
+        String text = body.getOrDefault("text", "");
+        String cleaned = textPreprocessor.preprocess(text);
+
+        NewsType type = newsTypeClassifier.classify(cleaned);
+        LocationResult location = locationExtractor.extract(cleaned);
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("originalText", text);
+        result.put("cleanedText", cleaned);
+        result.put("type", type != null ? type.name() : null);
+        result.put("district", location != null ? location.getDistrict() : null);
+        result.put("locationText", location != null ? location.getLocationText() : null);
+        return result;
+    }
+
+    /**
+     * URL'den haber çekip sınıflandırma test endpoint'i.
+     * Verilen URL'ye gider, başlık ve içeriği çıkarır, pipeline'dan geçirir.
+     *
+     * Kullanım:
+     *   POST /api/news/classify-url
+     *   Body: { "url": "https://yenikocaeli.com/haber/..." }
+     */
+    @PostMapping("/classify-url")
+    public Map<String, Object> classifyFromUrl(@RequestBody Map<String, String> body) {
+        String url = body.getOrDefault("url", "");
+        if (url.isBlank()) {
+            return Map.of("error", "URL boş olamaz");
+        }
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("url", url);
+
+        try {
+            org.jsoup.nodes.Document doc = com.bedirhan.cityeventmonitor.scraper.ScraperHttp.connect(url).get();
+
+            // Başlık: önce og:title, sonra <title>, sonra h1
+            String title = null;
+            org.jsoup.nodes.Element ogTitle = doc.selectFirst("meta[property=og:title]");
+            if (ogTitle != null) title = ogTitle.attr("content");
+            if (title == null || title.isBlank()) title = doc.title();
+            if (title == null || title.isBlank()) {
+                org.jsoup.nodes.Element h1 = doc.selectFirst("h1");
+                if (h1 != null) title = h1.text();
+            }
+
+            String content = com.bedirhan.cityeventmonitor.scraper.DetailPageHelper.extractContent(doc);
+            String dateStr = com.bedirhan.cityeventmonitor.scraper.DetailPageHelper.extractDate(doc);
+
+            result.put("extractedTitle", title);
+            result.put("extractedDate", dateStr);
+            result.put("contentLength", content != null ? content.length() : 0);
+            result.put("contentPreview", content != null ? content.substring(0, Math.min(300, content.length())) + "..." : null);
+
+            // Pipeline: preprocess → classify → extract location
+            String combined = (title != null ? title : "") + " " + (content != null ? content : "");
+            String cleaned = textPreprocessor.preprocess(combined);
+
+            NewsType type = newsTypeClassifier.classify(cleaned);
+            LocationResult location = locationExtractor.extract(cleaned);
+
+            result.put("type", type != null ? type.name() : null);
+            result.put("district", location != null ? location.getDistrict() : null);
+            result.put("locationText", location != null ? location.getLocationText() : null);
+
+        } catch (Exception e) {
+            result.put("error", "Sayfa okunamadı: " + e.getMessage());
+        }
+
+        return result;
     }
 }
