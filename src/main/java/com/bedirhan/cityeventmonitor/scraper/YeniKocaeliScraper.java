@@ -67,7 +67,13 @@ public class YeniKocaeliScraper implements NewsScraper {
         String url = href.startsWith("http") ? href : BASE_URL + href;
         String title = link.attr("title");
         if (title == null || title.isBlank()) title = link.text();
-        if (title == null || title.isBlank()) return null;
+        if (title == null || title.isBlank()) {
+            Element img = link.selectFirst("img");
+            if (img != null) title = img.attr("alt");
+        }
+        // Eğer anasayfada hiçbir başlık metni bulamazsak pas geçmek yerine detay sayfasına gitmesine izin ver.
+        // Detay sayfasında 'extractTitle' metodu zaten asıl başlığı alıp bunun üzerine yazacak.
+        if (title == null || title.isBlank()) title = "Geçici Başlık";
 
         RawNews raw = new RawNews();
         raw.setTitle(title);
