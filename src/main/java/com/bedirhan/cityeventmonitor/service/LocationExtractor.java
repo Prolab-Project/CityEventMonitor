@@ -160,13 +160,21 @@ public class LocationExtractor {
         // 2) Genel adres pattern'i ile yakalamaya çalış
         Matcher matcher = ADDRESS_PATTERN.matcher(contentLower);
         if (matcher.find()) {
-            return matcher.group(1);
+            String match = matcher.group(1);
+            // Çok uzun eşleşmeleri reddet (hatalı pattern eşleşmesi)
+            if (match.length() <= 80) {
+                return match;
+            }
         }
 
         // 3) Genişletilmiş adres pattern'i
         Matcher extendedMatcher = ADDRESS_PATTERN_EXTENDED.matcher(contentLower);
         if (extendedMatcher.find()) {
-            return extendedMatcher.group(1);
+            String match = extendedMatcher.group(1);
+            // Çok uzun eşleşmeleri reddet (hatalı pattern eşleşmesi)
+            if (match.length() <= 80) {
+                return match;
+            }
         }
 
         return null;

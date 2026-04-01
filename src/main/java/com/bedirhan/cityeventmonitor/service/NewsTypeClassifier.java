@@ -16,7 +16,8 @@ public class NewsTypeClassifier {
             NewsType.YANGIN,
             NewsType.ELEKTRIK_KESINTISI,
             NewsType.HIRSIZLIK,
-            NewsType.KULTUREL_ETKINLIK
+            NewsType.KULTUREL_ETKINLIK,
+            NewsType.DIGER
     );
 
     /**
@@ -113,7 +114,7 @@ public class NewsTypeClassifier {
      */
     public NewsType classify(String rawContent) {
         if (rawContent == null || rawContent.isBlank()) {
-            return null;
+            return NewsType.DIGER;
         }
 
         String content = rawContent.toLowerCase(Locale.forLanguageTag("tr-TR"));
@@ -123,6 +124,10 @@ public class NewsTypeClassifier {
         NewsType bestType = null;
 
         for (NewsType type : NewsType.values()) {
+            // DIGER tipini sınıflandırmada atla (fallback olarak kullan)
+            if (type == NewsType.DIGER) {
+                continue;
+            }
             ScoreResult result = scoreForType(type, content, tokens);
             if (result.rawScore < MIN_RAW_SCORE) {
                 continue;
@@ -139,7 +144,7 @@ public class NewsTypeClassifier {
             }
         }
 
-        return bestType;
+        return bestType != null ? bestType : NewsType.DIGER;
     }
 
     // ── Skor Hesaplama ──────────────────────────────────────────────────────

@@ -30,6 +30,7 @@ const typeLabels: Record<NewsType, string> = {
   ELEKTRIK_KESINTISI: 'Elektrik kesintisi',
   HIRSIZLIK: 'Hırsızlık / güvenlik',
   KULTUREL_ETKINLIK: 'Kültürel etkinlik',
+  DIGER: 'Diğer',
 };
 
 const typeDotColors: Record<NewsType, string> = {
@@ -38,6 +39,7 @@ const typeDotColors: Record<NewsType, string> = {
   ELEKTRIK_KESINTISI: '#ca8a04',
   HIRSIZLIK: '#7c3aed',
   KULTUREL_ETKINLIK: '#16a34a',
+  DIGER: '#6b7280',
 };
 
 const menuPaperSx = {

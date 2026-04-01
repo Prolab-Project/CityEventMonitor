@@ -5,6 +5,7 @@ public enum NewsType {
     YANGIN,
     ELEKTRIK_KESINTISI,
     HIRSIZLIK,
-    KULTUREL_ETKINLIK
+    KULTUREL_ETKINLIK,
+    DIGER
 }
 

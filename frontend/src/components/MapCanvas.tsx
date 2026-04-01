@@ -24,6 +24,7 @@ const MARKER_COLORS: Record<NewsType, string> = {
   ELEKTRIK_KESINTISI: '#ca8a04',
   HIRSIZLIK: '#7c3aed',
   KULTUREL_ETKINLIK: '#16a34a',
+  DIGER: '#6b7280',
 };
 
 const DEFAULT_MARKER_COLOR = '#6b7280';
@@ -34,6 +35,7 @@ const MARKER_EMOJIS: Record<NewsType, string> = {
   ELEKTRIK_KESINTISI: '⚡',
   HIRSIZLIK: '🥷',
   KULTUREL_ETKINLIK: '🎭',
+  DIGER: '📰',
 };
 
 const TYPE_LABELS_TR: Record<NewsType, string> = {
@@ -42,6 +44,7 @@ const TYPE_LABELS_TR: Record<NewsType, string> = {
   ELEKTRIK_KESINTISI: 'Elektrik kesintisi',
   HIRSIZLIK: 'Hırsızlık / güvenlik',
   KULTUREL_ETKINLIK: 'Kültürel etkinlik',
+  DIGER: 'Diğer',
 };
 
 function getTypePresentation(type: NewsType | null): { label: string; color: string; emoji: string } {

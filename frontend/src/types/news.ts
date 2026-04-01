@@ -3,7 +3,8 @@ export type NewsType =
   | 'YANGIN'
   | 'ELEKTRIK_KESINTISI'
   | 'HIRSIZLIK'
-  | 'KULTUREL_ETKINLIK';
+  | 'KULTUREL_ETKINLIK'
+  | 'DIGER';
 
 export interface News {
   id: string;
