@@ -180,8 +180,26 @@ public class NewsService {
             if (request.getUrl() != null && !request.getUrl().isBlank()) {
                 if(existing.getUrls().add(request.getUrl())) updated = true;
             }
+
+            // Geliştirme: Eğer veritabanındaki başlık "GÜNDEM", "ASAYİŞ" gibi kısa ve hatalı bir başlıksa
+            // ve yeni gelen başlık daha uzun ve gerçekçi bir başlıksa üzerine yazarak düzelt.
+            String existingTitle = existing.getTitle();
+            String newTitle = request.getTitle();
+            if (newTitle != null && !newTitle.isBlank()) {
+                if (existingTitle == null ||
+                    existingTitle.equals("GÜNDEM") ||
+                    existingTitle.equals("ASAYİŞ") ||
+                    existingTitle.equals("PERDE ARKASI") ||
+                    existingTitle.equals("SİYASET") ||
+                    (newTitle.length() > existingTitle.length() + 10)) {
+                    
+                    existing.setTitle(newTitle);
+                    updated = true;
+                }
+            }
+
             if (updated) {
-                logger.info("Duplicate found for URL/Title. Sources/URLs updated for document id: {}", existing.getId());
+                logger.info("Duplicate found for URL/Title. Sources/URLs/Title updated for document id: {}", existing.getId());
                 return newsRepository.save(existing);
             }
             logger.debug("Duplicate found but no new sources/URLs to attach. Ignoring.");

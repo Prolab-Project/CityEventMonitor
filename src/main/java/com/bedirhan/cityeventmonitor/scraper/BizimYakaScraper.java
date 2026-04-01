@@ -82,6 +82,11 @@ public class BizimYakaScraper implements NewsScraper {
         try {
             Document detail = ScraperHttp.connect(raw.getUrl()).get();
 
+            String realTitle = DetailPageHelper.extractTitle(detail);
+            if (realTitle != null && !realTitle.isBlank()) {
+                raw.setTitle(realTitle);
+            }
+
             String content = DetailPageHelper.extractContent(detail);
             if (content != null && !content.isBlank()) raw.setContent(content);
 

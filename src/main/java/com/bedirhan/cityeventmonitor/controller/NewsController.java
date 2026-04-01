@@ -163,6 +163,58 @@ public class NewsController {
     }
 
     /**
+     * Sadece belirli bir kaynaktan scraping tetikleme endpoint'i.
+     * Örnek: POST /api/news/scrape/source/Özgür Kocaeli?days=3
+     */
+    @PostMapping("/scrape/source/{sourceName}")
+    public ScrapeResultDto scrapeSource(@PathVariable String sourceName, @RequestParam(value = "days", defaultValue = "3") int days) {
+        return scrapingService.scrapeSource(sourceName, days);
+    }
+
+    /**
+     * Sadece belirli bir kaynaktan sıralı scrape ilerlemesini SSE ile yayınlar.
+     * GET /api/news/scrape/source/Özgür Kocaeli/stream?days=3
+     */
+    @GetMapping(value = "/scrape/source/{sourceName}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter scrapeSourceStream(@PathVariable String sourceName, @RequestParam(value = "days", defaultValue = "3") int days) {
+        SseEmitter emitter = new SseEmitter(0L);
+
+        java.util.concurrent.ScheduledExecutorService heartbeat =
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        heartbeat.scheduleAtFixedRate(() -> {
+            try {
+                emitter.send(SseEmitter.event().comment("heartbeat"));
+            } catch (Exception ignored) {
+                heartbeat.shutdown();
+            }
+        }, 10, 10, java.util.concurrent.TimeUnit.SECONDS);
+
+        emitter.onCompletion(heartbeat::shutdown);
+        emitter.onTimeout(heartbeat::shutdown);
+        emitter.onError(e -> heartbeat.shutdown());
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                scrapingService.scrapeSource(sourceName, days, event -> {
+                    try {
+                        emitter.send(SseEmitter.event().name("scrape").data(event, MediaType.APPLICATION_JSON));
+                    } catch (IOException | IllegalStateException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                });
+                emitter.complete();
+            } catch (Exception ex) {
+                try {
+                    emitter.send(SseEmitter.event().name("scrape_error").data(
+                            Map.of("message", ex.getMessage() != null ? ex.getMessage() : "Bilinmeyen hata")));
+                } catch (Exception ignored) {}
+                emitter.completeWithError(ex);
+            }
+        });
+        return emitter;
+    }
+
+    /**
      * Veritabanındaki tüm haberleri yeniden işler (tür, ilçe, geocoding).
      * Sınıflandırıcı/konum çıkarıcı güncellendikten sonra mevcut kayıtları güncellemek için kullanılır.
      * POST /api/news/reprocess

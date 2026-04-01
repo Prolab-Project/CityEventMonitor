@@ -122,6 +122,83 @@ public class ScrapingService {
         return dto;
     }
 
+    public ScrapeResultDto scrapeSource(String targetSourceName, int days) {
+        return scrapeSource(targetSourceName, days, null);
+    }
+
+    public ScrapeResultDto scrapeSource(String targetSourceName, int days, Consumer<ScrapeProgressEventDto> progress) {
+        NewsScraper targetScraper = null;
+        for (NewsScraper s : scrapers) {
+            if (s.getSourceName().replace(" ", "").equalsIgnoreCase(targetSourceName.replace(" ", ""))) {
+                targetScraper = s;
+                break;
+            }
+        }
+        
+        if (targetScraper == null) {
+            throw new IllegalArgumentException("Scraper bulunamadı: " + targetSourceName);
+        }
+
+        int totalScraped = 0;
+        int newSaved = 0;
+        int duplicatesMerged = 0;
+        int geocodingFailedCount = 0;
+        int actualDays = (days > 0) ? days : defaultDays;
+        Map<String, Integer> perSource = new LinkedHashMap<>();
+
+        String sourceName = targetScraper.getSourceName();
+        logger.info("Starting single scrape process for {} (last {} days)", sourceName, actualDays);
+
+        if (progress != null) {
+            progress.accept(ScrapeProgressEventDto.sourceStart(sourceName, 1, 1));
+        }
+
+        int extractedThisSource = 0;
+        try {
+            logger.info("Running scraper: {}", sourceName);
+            List<RawNews> rawNewsList = targetScraper.scrape(actualDays);
+            extractedThisSource = rawNewsList.size();
+            totalScraped += extractedThisSource;
+
+            LocalDateTime cutoff = LocalDateTime.now().minusDays(actualDays);
+            for (RawNews raw : rawNewsList) {
+                try {
+                    if (!isWithinLastDays(raw, cutoff)) {
+                        continue;
+                    }
+                    PipelineResult result = processAndSavePipeline(raw);
+                    if (result.isGeocodingFailed()) {
+                        geocodingFailedCount++;
+                    } else if (result.isNew()) {
+                        newSaved++;
+                    } else {
+                        duplicatesMerged++;
+                    }
+                } catch (Exception ex) {
+                    logger.error("Failed to process RawNews from {}: {}", sourceName, ex.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error occurred while scraping with {}: {}", sourceName, e.getMessage());
+        }
+        perSource.put(sourceName, extractedThisSource);
+
+        if (progress != null) {
+            progress.accept(ScrapeProgressEventDto.sourceDone(sourceName, 1, 1, extractedThisSource));
+        }
+
+        ScrapeResultDto dto = new ScrapeResultDto();
+        dto.setTotalScraped(totalScraped);
+        dto.setNewSaved(newSaved);
+        dto.setDuplicatesMerged(duplicatesMerged);
+        dto.setGeocodingFailed(geocodingFailedCount);
+        dto.setScrapedBySource(perSource);
+        if (progress != null) {
+            progress.accept(ScrapeProgressEventDto.complete(dto));
+        }
+        return dto;
+    }
+
     record PipelineResult(boolean isNew, boolean isGeocodingFailed) {}
 
     /**

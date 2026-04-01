@@ -25,6 +25,26 @@ public final class DetailPageHelper {
     }
 
     /**
+     * Dokümandan haberin gerçek başlığını (title) çıkarır. Anasayfadan alınan hatalı
+     * (örn: Kategori adı taşıyan) başlıkları detay sayfasında ezmek için kullanılır.
+     */
+    public static String extractTitle(Document doc) {
+        Element ogTitle = doc.selectFirst("meta[property=og:title]");
+        if (ogTitle != null && !ogTitle.attr("content").isBlank()) {
+            return ogTitle.attr("content").trim();
+        }
+        Element h1 = doc.selectFirst("h1");
+        if (h1 != null && !h1.text().isBlank()) {
+            return h1.text().trim();
+        }
+        String title = doc.title();
+        if (title != null && !title.isBlank()) {
+            return title.trim();
+        }
+        return null;
+    }
+
+    /**
      * Dokümandan haber gövdesi metnini dener; ilk eşleşen selector'ın text'ini döner.
      */
     public static String extractContent(Document doc) {
