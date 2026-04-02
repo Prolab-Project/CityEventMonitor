@@ -41,9 +41,9 @@ public class NewsTypeClassifier {
                 "kundaklama", "alev aldı", "tutuştu", "söndürüldü", "yangından"
         ));
         keywordMap.put(NewsType.ELEKTRIK_KESINTISI, List.of(
-                "elektrik kesintisi", "enerji kesintisi", "planlı kesinti", "bakım çalışması",
-                "trafo arızası", "hat çalışması", "yüksek gerilim hattı", "aydınlatma arızası",
-                "elektrik kesildi", "tedarik", "arıza", "şebeke", "sedaş", "kesinti programı"
+                "elektrik kesintisi", "enerji kesintisi", "planlı elektrik kesintisi", 
+                "trafo arızası", "yüksek gerilim hattı", "aydınlatma arızası",
+                "elektrik kesildi", "sedaş", "elektrik verilemeyecek", "elektrikler kesilecek"
         ));
         // "polis", "gözaltına", "tutuklandı" gibi genel asayiş kelimeleri hırsızlık keyword'ünden
         // çıkarıldı. Başka asayiş olayları (ör: operasyon) yanlışlıkla hırsızlık sanılmasın.
@@ -72,7 +72,7 @@ public class NewsTypeClassifier {
         // "hat" çıkarıldı: sadece 3 karakter, "hatip" (İmam Hatip) gibi kelimelerde yanlış eşleşir.
         // "hat çalışması" zaten keyword olarak var.
         positiveContextMap.put(NewsType.ELEKTRIK_KESINTISI, List.of(
-                "elektrik", "enerji", "şebeke", "trafo", "sedaş", "planlı", "gerilim"
+                "elektrik", "enerji", "şebeke", "trafo", "sedaş", "planlı", "gerilim", "arıza", "kesinti programı", "bakım çalışması", "hat"
         ));
         positiveContextMap.put(NewsType.HIRSIZLIK, List.of(
                 "hırsız", "çalın", "polis", "gözalt", "tutuk", "şüpheli", "soygun", "gasp"
@@ -86,10 +86,11 @@ public class NewsTypeClassifier {
                 "transfer", "oyuncu", "festival", "konser", "elektrik kesintisi", "hırsızlık"
         ));
         negativeContextMap.put(NewsType.YANGIN, List.of(
-                "transfer", "futbol", "konser", "elektrik kesintisi"
+                "transfer", "futbol", "konser", "elektrik kesintisi", "teçhizat", "trafik kanunu", "mevzuat"
         ));
         negativeContextMap.put(NewsType.ELEKTRIK_KESINTISI, List.of(
-                "transfer", "oyuncu", "kocaelispor", "festival", "konser", "hırsızlık"
+                "transfer", "oyuncu", "kocaelispor", "festival", "konser", "hırsızlık",
+                "su", "baraj", "içme suyu", "gölet", "isu", "içmesuyu", "dsi"
         ));
         negativeContextMap.put(NewsType.HIRSIZLIK, List.of(
                 "transfer", "maç", "konser", "elektrik kesintisi", "trafik kazası"

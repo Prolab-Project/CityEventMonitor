@@ -27,16 +27,19 @@ public class NewsController {
     private final NewsService newsService;
     private final ScrapingService scrapingService;
     private final NewsTypeClassifier newsTypeClassifier;
+    private final SemanticTypeValidator semanticTypeValidator;
     private final LocationExtractor locationExtractor;
     private final TextPreprocessor textPreprocessor;
 
     public NewsController(NewsService newsService, ScrapingService scrapingService,
                           NewsTypeClassifier newsTypeClassifier,
+                          SemanticTypeValidator semanticTypeValidator,
                           LocationExtractor locationExtractor,
                           TextPreprocessor textPreprocessor) {
         this.newsService = newsService;
         this.scrapingService = scrapingService;
         this.newsTypeClassifier = newsTypeClassifier;
+        this.semanticTypeValidator = semanticTypeValidator;
         this.locationExtractor = locationExtractor;
         this.textPreprocessor = textPreprocessor;
     }
@@ -241,13 +244,15 @@ public class NewsController {
         String text = body.getOrDefault("text", "");
         String cleaned = textPreprocessor.preprocess(text);
 
-        NewsType type = newsTypeClassifier.classify(cleaned);
+        NewsType keywordType = newsTypeClassifier.classify(cleaned);
+        NewsType semanticType = semanticTypeValidator.validate(cleaned, "", keywordType);
         LocationResult location = locationExtractor.extract(cleaned);
 
         Map<String, Object> result = new java.util.LinkedHashMap<>();
         result.put("originalText", text);
         result.put("cleanedText", cleaned);
-        result.put("type", type != null ? type.name() : null);
+        result.put("keywordType", keywordType != null ? keywordType.name() : null);
+        result.put("type", semanticType != null ? semanticType.name() : null);
         result.put("district", location != null ? location.getDistrict() : null);
         result.put("locationText", location != null ? location.getLocationText() : null);
         return result;
@@ -296,10 +301,12 @@ public class NewsController {
             String combined = (title != null ? title : "") + " " + (content != null ? content : "");
             String cleaned = textPreprocessor.preprocess(combined);
 
-            NewsType type = newsTypeClassifier.classify(cleaned);
+            NewsType keywordType = newsTypeClassifier.classify(cleaned);
+            NewsType semanticType = semanticTypeValidator.validate(title, content, keywordType);
             LocationResult location = locationExtractor.extract(cleaned);
 
-            result.put("type", type != null ? type.name() : null);
+            result.put("keywordType", keywordType != null ? keywordType.name() : null);
+            result.put("type", semanticType != null ? semanticType.name() : null);
             result.put("district", location != null ? location.getDistrict() : null);
             result.put("locationText", location != null ? location.getLocationText() : null);
 

@@ -17,7 +17,6 @@ import java.util.Map;
 public class EmbeddingService {
 
     private static final Logger log = LoggerFactory.getLogger(EmbeddingService.class);
-    private static final int FALLBACK_DIM = 256;
 
     private final TextPreprocessor textPreprocessor;
     private final WebClient webClient;
@@ -28,39 +27,49 @@ public class EmbeddingService {
                             WebClient.Builder webClientBuilder,
                             @Value("${embedding.api-key:}") String apiKey,
                             @Value("${embedding.model:sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}") String model,
-                            @Value("${embedding.base-url:https://api-inference.huggingface.co/models}") String baseUrl) {
+                            @Value("${embedding.base-url:https://router.huggingface.co/hf-inference/models}") String baseUrl) {
         this.textPreprocessor = textPreprocessor;
         this.apiKey = apiKey;
         this.model = model;
         this.webClient = webClientBuilder.baseUrl(baseUrl).build();
     }
 
+    public boolean isRemoteAvailable() {
+        return apiKey != null && !apiKey.trim().isBlank();
+    }
+
     /**
-     * Başlık + içerikten embedding üretir.
-     * Öncelik: Harici embedding modeli (HuggingFace Inference API).
-     * API key yoksa/başarısızsa fallback hash-embedding döner (sistem akışı bozulmasın diye).
+     * HF Inference API'nin yeni SentenceSimilarityPipeline formatını kullanarak,
+     * hedef cümle ile referans cümleler listesi arasındaki benzerlik skorlarını döner.
      */
-    public List<Double> generateEmbedding(String title, String content) {
-        String combined = (title != null ? title : "") + " " + (content != null ? content : "");
-        String cleanedText = textPreprocessor.preprocess(combined);
-        if (cleanedText.isBlank()) {
+    public List<Double> calculateSimilarities(String sourceText, List<String> referenceTexts) {
+        String cleanedSource = textPreprocessor.preprocess(sourceText);
+        if (cleanedSource.isBlank() || referenceTexts == null || referenceTexts.isEmpty()) {
             return List.of();
         }
 
-        List<Double> modelVector = tryRemoteEmbedding(cleanedText);
-        if (modelVector != null && !modelVector.isEmpty()) {
-            return modelVector;
+        List<Double> scores = tryRemoteSimilarities(cleanedSource, referenceTexts);
+        if (scores != null && !scores.isEmpty()) {
+            return scores;
         }
-        return fallbackHashEmbedding(cleanedText);
+        
+        // API hata verirse tüm skorları 0 dön, böylece validator fallback yapar.
+        List<Double> fallback = new ArrayList<>(referenceTexts.size());
+        for (int i = 0; i < referenceTexts.size(); i++) fallback.add(0.0);
+        return fallback;
     }
 
-    private List<Double> tryRemoteEmbedding(String text) {
-        if (apiKey == null || apiKey.isBlank()) {
+    private List<Double> tryRemoteSimilarities(String sourceText, List<String> referenceTexts) {
+        if (!isRemoteAvailable()) {
             return null;
         }
         try {
+            Map<String, Object> inputs = new LinkedHashMap<>();
+            inputs.put("source_sentence", sourceText);
+            inputs.put("sentences", referenceTexts);
+
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("inputs", text);
+            body.put("inputs", inputs);
             body.put("options", Map.of("wait_for_model", true));
 
             @SuppressWarnings("unchecked")
@@ -76,32 +85,37 @@ public class EmbeddingService {
             if (response == null || response.isEmpty()) {
                 return null;
             }
-            // HF bazen [float,float,...], bazen [[float,...]] dönebiliyor.
-            Object first = response.get(0);
-            if (first instanceof Number) {
-                List<Double> vec = new ArrayList<>(response.size());
-                for (Object item : response) {
-                    if (item instanceof Number n) vec.add(n.doubleValue());
+
+            List<Double> scores = new ArrayList<>(response.size());
+            for (Object item : response) {
+                if (item instanceof Number n) {
+                    scores.add(n.doubleValue());
+                } else {
+                    scores.add(0.0);
                 }
-                return vec;
             }
-            if (first instanceof List<?> nested) {
-                List<Double> vec = new ArrayList<>(nested.size());
-                for (Object item : nested) {
-                    if (item instanceof Number n) vec.add(n.doubleValue());
-                }
-                return vec;
-            }
+            return scores;
         } catch (Exception e) {
-            log.warn("Remote embedding failed, fallback'a geçiliyor: {}", e.getMessage());
+            log.warn("Remote similarity calculation failed (API down?): {}", e.getMessage());
         }
         return null;
     }
 
     /**
-     * Fallback: deterministik hash tabanlı vektör.
-     * Not: Asıl hedef remote embedding; bu sadece servis erişimi olmadığında akışı kırmamak içindir.
+     * Sadece DuplicateDetectionService tarafından yerel benzerlik ölçümü için kullanılır.
+     * Hugging Face API'ye gitmez (Zaten HF vector API'si iptal oldu), metni hashleyerek sahte vektör oluşturur.
      */
+    public List<Double> generateEmbedding(String title, String content) {
+        String combined = (title != null ? title : "") + " " + (content != null ? content : "");
+        String cleanedText = textPreprocessor.preprocess(combined);
+        if (cleanedText.isBlank()) {
+            return List.of();
+        }
+        return fallbackHashEmbedding(cleanedText);
+    }
+
+    private static final int FALLBACK_DIM = 256;
+
     private List<Double> fallbackHashEmbedding(String text) {
         double[] arr = new double[FALLBACK_DIM];
         String[] tokens = text.split("\\s+");
@@ -110,13 +124,12 @@ public class EmbeddingService {
             int idx = Math.abs(t.hashCode()) % FALLBACK_DIM;
             arr[idx] += 1.0;
         }
-        // L2 normalize
         double norm = 0.0;
         for (double v : arr) norm += v * v;
         norm = Math.sqrt(norm);
         List<Double> result = new ArrayList<>(FALLBACK_DIM);
         for (double v : arr) {
-            result.add(norm > 0 ? v / norm : 0.0);
+            result.add(norm > 0 ? (v / norm) : 0.0);
         }
         return result;
     }

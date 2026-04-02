@@ -25,6 +25,7 @@ public class ScrapingService {
     private final List<NewsScraper> scrapers;
     private final TextPreprocessor textPreprocessor;
     private final NewsTypeClassifier newsTypeClassifier;
+    private final SemanticTypeValidator semanticTypeValidator;
     private final LocationExtractor locationExtractor;
     private final NewsService newsService;
     private final NewsDateParser newsDateParser;
@@ -35,12 +36,14 @@ public class ScrapingService {
     public ScrapingService(List<NewsScraper> scrapers,
                            TextPreprocessor textPreprocessor,
                            NewsTypeClassifier newsTypeClassifier,
+                           SemanticTypeValidator semanticTypeValidator,
                            LocationExtractor locationExtractor,
                            NewsService newsService,
                            NewsDateParser newsDateParser) {
         this.scrapers = scrapers;
         this.textPreprocessor = textPreprocessor;
         this.newsTypeClassifier = newsTypeClassifier;
+        this.semanticTypeValidator = semanticTypeValidator;
         this.locationExtractor = locationExtractor;
         this.newsService = newsService;
         this.newsDateParser = newsDateParser;
@@ -209,8 +212,12 @@ public class ScrapingService {
         String cleanTitle = textPreprocessor.preprocess(raw.getTitle());
         String cleanContent = textPreprocessor.preprocess(raw.getContent());
 
-        // 2. Haber tipi belirleme
-        var newsType = newsTypeClassifier.classify(cleanTitle + " " + cleanContent);
+        // 2. Haber tipi belirleme (Hibrid: Keyword → MiniLM doğrulama)
+        //    - Önce keyword tabanlı sınıflandırma (hızlı, kurallı)
+        //    - DIGER değilse: MiniLM ile anlamsal doğrulama (ilk 150 kar. gönderilir)
+        //    - DIGER ise: MiniLM'e hiç gidilmez (API çağrısı ve zaman tasarrufu)
+        var keywordType = newsTypeClassifier.classify(cleanTitle + " " + cleanContent);
+        var newsType = semanticTypeValidator.validate(cleanTitle, cleanContent, keywordType);
 
         // 3. Lokasyon çıkarma
         var locationResult = locationExtractor.extract(cleanTitle + " " + cleanContent);
