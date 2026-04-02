@@ -19,7 +19,7 @@ public class SemanticTypeValidator {
 
     private static final Logger log = LoggerFactory.getLogger(SemanticTypeValidator.class);
 
-    private static final int MAX_VALIDATION_CHARS = 150;
+    private static final int MAX_VALIDATION_CHARS = 500;
 
     private static final Map<NewsType, List<String>> REFERENCE_TEXTS = new EnumMap<>(NewsType.class);
 

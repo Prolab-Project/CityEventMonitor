@@ -250,8 +250,20 @@ public class NewsService {
     }
 
     /**
+     * Veritabanındaki tüm haber kayıtlarını tamamen siler.
+     * @return Silinen kayıt sayısı
+     */
+    public long deleteAllNews() {
+        long count = newsRepository.count();
+        newsRepository.deleteAll();
+        logger.info("Database cleared. Deleted {} news records.", count);
+        return count;
+    }
+
+    /**
      * Veritabanındaki tüm haberleri yeniden işler: tür sınıflandırması, ilçe/konum çıkarımı ve geocoding.
      * Böylece sınıflandırıcı veya konum çıkarıcı güncellendiğinde mevcut kayıtlar güncellenir.
+     *
      *
      * @return Güncellenen haber sayısı
      */

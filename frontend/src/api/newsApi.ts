@@ -125,3 +125,8 @@ export async function triggerScrape(days = 3): Promise<ScrapeResult> {
   return response.data;
 }
 
+export async function deleteAllNews(): Promise<{ message: string, deletedCount: number }> {
+  const response = await apiClient.delete<{ message: string, deletedCount: number }>('/news');
+  return response.data;
+}
+

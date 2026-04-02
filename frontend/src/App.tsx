@@ -20,6 +20,7 @@ import {
   getMapNews,
   getNews,
   triggerScrapeStream,
+  deleteAllNews,
   type ScrapeResult,
 } from './api/newsApi';
 import { 
@@ -190,6 +191,22 @@ function App() {
     await fetchNews();
   };
 
+  const handleClearDatabase = async () => {
+    if (!window.confirm("Bütün veritabanını silmek istediğinize emin misiniz? Bu işlem geri alınamaz!")) return;
+    
+    setIsLoading(true);
+    try {
+      const res = await deleteAllNews();
+      alert(`Sıfırlama başarılı!\nSilinen haber sayısı: ${res.deletedCount}`);
+      await fetchNews();
+    } catch (err) {
+      console.error(err);
+      alert("Sıfırlama işlemi başarısız oldu.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleFilterChange = (next: FilterState) => {
     setFilterState(next);
   };
@@ -231,8 +248,9 @@ function App() {
               <p className="filter-scrape-hint">
                 Beş haber sitesinden son günlerin içeriğini çeker; işlem birkaç dakika sürebilir.
               </p>
-              <button
-                type="button"
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button
+                  type="button"
                 className="filter-scrape-btn"
                 disabled={isLoading || scrapeLoading}
                 onClick={handleRefreshAllNews}
@@ -266,6 +284,17 @@ function App() {
                   </>
                 )}
               </button>
+              
+              <button
+                type="button"
+                className="filter-scrape-btn"
+                style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderColor: '#ef4444' }}
+                disabled={isLoading || scrapeLoading}
+                onClick={handleClearDatabase}
+              >
+                Tüm Veritabanını Sıfırla
+              </button>
+              </div>
             </div>
             <NewsFetchStatsBar
               filteredTotal={newsPage?.totalElements ?? 0}

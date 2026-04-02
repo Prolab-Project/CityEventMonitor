@@ -68,6 +68,18 @@ public class NewsController {
     }
 
     /**
+     * Veritabanındaki tüm haberleri sıfırlar.
+     */
+    @DeleteMapping
+    public ResponseEntity<Map<String, Object>> deleteAllNews() {
+        long deletedCount = newsService.deleteAllNews();
+        return ResponseEntity.ok(Map.of(
+                "message", "Veritabanı başarıyla sıfırlandı.",
+                "deletedCount", deletedCount
+        ));
+    }
+
+    /**
      * Harita için sayfalamasız filtreli haber listesi.
      * GET /api/news/map?type=...&district=...&startDate=...&endDate=...&search=...
      */

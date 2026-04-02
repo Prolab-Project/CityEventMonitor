@@ -62,7 +62,7 @@ public class YeniKocaeliScraper implements NewsScraper {
 
     private RawNews buildFromListLink(Element link) {
         String href = link.attr("href");
-        if (href == null || href.isBlank()) return null;
+        if (href == null || href.isBlank() || href.contains("#")) return null;
 
         String url = href.startsWith("http") ? href : BASE_URL + href;
         String title = link.attr("title");
