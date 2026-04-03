@@ -115,10 +115,15 @@ public class SemanticTypeValidator {
 
             NewsType bestType = null;
             double maxSim = minSimilarityThreshold; // Eşiğin altında kalanlar baştan reddedilir
+            double keywordSim = 0.0;
 
             for (int i = 0; i < scores.size(); i++) {
                 double sim = scores.get(i);
                 NewsType currentType = flatReferenceTypes.get(i);
+                
+                if (currentType == keywordType && sim > keywordSim) {
+                    keywordSim = sim;
+                }
                 
                 if (sim > maxSim) {
                     maxSim = sim;
@@ -136,9 +141,15 @@ public class SemanticTypeValidator {
                 log.debug("[SemanticValidator] ONAYLANDI ✅ → {}", keywordType);
                 return keywordType;
             } else {
-                log.info("[SemanticValidator] Tür DEĞİŞTİRİLDİ 🔄 → Keyword: {} | Yeni Çıktı: {} | Metin: \"{}\"",
-                        keywordType, bestType, validationText);
-                return bestType;
+                if (maxSim > (keywordSim + 0.12) && maxSim > 0.45) {
+                    log.info("[SemanticValidator] Tür DEĞİŞTİRİLDİ 🔄 → Keyword: {} ({}), Yeni Çıktı: {} ({}) | Metin: \"{}\"",
+                            keywordType, String.format("%.2f", keywordSim), bestType, String.format("%.2f", maxSim), validationText);
+                    return bestType;
+                } else {
+                    log.info("[SemanticValidator] Tür DEĞİŞİMİ REDDEDİLDİ 🛡️ → Keyword: {} ({}) korundu. Alternatif: {} ({}) | Metin: \"{}\"",
+                            keywordType, String.format("%.2f", keywordSim), bestType, String.format("%.2f", maxSim), validationText);
+                    return keywordType;
+                }
             }
 
         } catch (Exception e) {

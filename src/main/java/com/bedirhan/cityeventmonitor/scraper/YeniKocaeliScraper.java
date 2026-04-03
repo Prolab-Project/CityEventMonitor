@@ -94,6 +94,19 @@ public class YeniKocaeliScraper implements NewsScraper {
             }
 
             String content = DetailPageHelper.extractContent(detail);
+            if (content == null || content.isBlank()) {
+                Element newsNode = detail.selectFirst(".news");
+                if (newsNode != null) {
+                    Element clone = newsNode.clone();
+                    clone.select(".benzer, .yorumlar, .post-share, .post-date").remove();
+                    StringBuilder sb = new StringBuilder();
+                    for (Element p : clone.select("p")) {
+                        String txt = p.text().trim();
+                        if (!txt.isBlank()) sb.append(txt).append(" ");
+                    }
+                    content = sb.toString().trim();
+                }
+            }
             if (content != null && !content.isBlank()) raw.setContent(content);
 
             String dateStr = DetailPageHelper.extractDate(detail);

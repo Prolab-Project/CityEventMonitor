@@ -59,7 +59,8 @@ public class NewsTypeClassifier {
                 "kültür merkezi", "kongre merkezi", "sanatçı", "gösteri", "tören",
                 "futbol", "maç", "şampiyona", "lig", "spor", "röportaj",
                 "canlı yayın", "kongre", "seminer", "eğitim", "kurs",
-                "kocaelispor", "transfer", "imza", "forvet", "stoper", "orta saha", "teknik direktör", "oyuncu"
+                "kocaelispor", "transfer", "imza", "forvet", "stoper", "orta saha", "teknik direktör", "oyuncu",
+                "gol", "takım", "skor", "galip", "galibiyet", "mağlup", "berabere", "müsabaka", "deplasman", "şampiyon", "fikstür"
         ));
 
         // ── Pozitif Bağlam Sinyalleri ──────────────────────────────────────
@@ -78,7 +79,7 @@ public class NewsTypeClassifier {
                 "hırsız", "çalın", "polis", "gözalt", "tutuk", "şüpheli", "soygun", "gasp"
         ));
         positiveContextMap.put(NewsType.KULTUREL_ETKINLIK, List.of(
-                "etkinlik", "konser", "festival", "tiyatro", "sergi", "söyleşi", "maç", "transfer", "oyuncu", "imza"
+                "etkinlik", "konser", "festival", "tiyatro", "sergi", "söyleşi", "maç", "transfer", "oyuncu", "imza", "takım", "gol"
         ));
 
         // ── Negatif Bağlam Sinyalleri ──────────────────────────────────────
@@ -256,7 +257,7 @@ public class NewsTypeClassifier {
      */
     private boolean matchesAnyToken(List<String> tokens, String keyword) {
         for (String token : tokens) {
-            if (token.startsWith(keyword)) {
+            if (isPlausiblePrefixMatch(token, keyword)) {
                 return true;
             }
         }
@@ -264,12 +265,32 @@ public class NewsTypeClassifier {
         String softened = softenLastConsonant(keyword);
         if (softened != null) {
             for (String token : tokens) {
-                if (token.startsWith(softened)) {
+                if (isPlausiblePrefixMatch(token, softened)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    private boolean isPlausiblePrefixMatch(String token, String keyword) {
+        if (!token.startsWith(keyword)) {
+            return false;
+        }
+        // Hatalı prefix eşleşmelerini önlemek için manuel istisnalar:
+        if (keyword.equals("kaza") && (token.startsWith("kazan") || token.startsWith("kazı") || token.startsWith("kazanç"))) {
+            return false;
+        }
+        if (keyword.equals("hat") && (token.startsWith("hata") || token.startsWith("hatır") || token.startsWith("hatip"))) {
+            return false;
+        }
+        if (keyword.equals("oyun") && (token.startsWith("oyna") || token.startsWith("oyunbozan"))) { // oyun -> oyuncu ok
+            // Oyna is not starting with oyun anyway
+        }
+        if (keyword.equals("çalın") && (token.startsWith("çalıntı") || token.startsWith("çalındı"))) {
+            return true; // bunlar ok
+        }
+        return true;
     }
 
     /**

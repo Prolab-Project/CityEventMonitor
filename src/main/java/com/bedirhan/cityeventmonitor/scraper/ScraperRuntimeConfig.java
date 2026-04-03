@@ -13,8 +13,8 @@ public class ScraperRuntimeConfig {
     private final int maxDetailPagesPerSource;
 
     public ScraperRuntimeConfig(
-            @Value("${scraping.max-detail-pages-per-source:200}") int maxDetailPagesPerSource) {
-        this.maxDetailPagesPerSource = Math.max(1, maxDetailPagesPerSource);
+            @Value("${scraping.max-detail-pages-per-source:-1}") int maxDetailPagesPerSource) {
+        this.maxDetailPagesPerSource = maxDetailPagesPerSource > 0 ? maxDetailPagesPerSource : Integer.MAX_VALUE;
     }
 
     public int getMaxDetailPagesPerSource() {

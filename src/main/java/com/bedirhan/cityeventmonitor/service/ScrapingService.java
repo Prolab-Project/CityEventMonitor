@@ -57,70 +57,96 @@ public class ScrapingService {
      * @param progress null değilse her kaynak başında/bitişinde ve en sonda SSE ile iletilir
      */
     public ScrapeResultDto scrapeAllSources(int days, Consumer<ScrapeProgressEventDto> progress) {
-        int totalScraped = 0;
-        int newSaved = 0;
-        int duplicatesMerged = 0;
-        int geocodingFailedCount = 0;
+        java.util.concurrent.atomic.AtomicInteger totalScraped = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger newSaved = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger duplicatesMerged = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger geocodingFailedCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        
         int actualDays = (days > 0) ? days : defaultDays;
-        Map<String, Integer> perSource = new LinkedHashMap<>();
+        Map<String, Integer> perSource = new java.util.concurrent.ConcurrentHashMap<>();
 
         int totalSources = scrapers.size();
         logger.info("Starting scrape process for last {} days. Total scrapers: {}", actualDays, totalSources);
 
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(totalSources > 0 ? totalSources : 1);
+        List<java.util.concurrent.CompletableFuture<Void>> futures = new java.util.ArrayList<>();
+
         for (int idx = 0; idx < totalSources; idx++) {
             NewsScraper scraper = scrapers.get(idx);
-            String sourceName = scraper.getSourceName();
-            int sourceIndex = idx + 1;
+            final String sourceName = scraper.getSourceName();
+            final int sourceIndex = idx + 1;
+            
             if (progress != null) {
-                progress.accept(ScrapeProgressEventDto.sourceStart(sourceName, sourceIndex, totalSources));
+                synchronized (progress) {
+                    progress.accept(ScrapeProgressEventDto.sourceStart(sourceName, sourceIndex, totalSources));
+                }
             }
 
-            int extractedThisSource = 0;
-            try {
-                logger.info("Running scraper: {}", sourceName);
-                List<RawNews> rawNewsList = scraper.scrape(actualDays);
-                extractedThisSource = rawNewsList.size();
-                totalScraped += extractedThisSource;
+            java.util.concurrent.CompletableFuture<Void> future = java.util.concurrent.CompletableFuture.runAsync(() -> {
+                int extractedThisSource = 0;
+                int localNewSaved = 0;
+                int localDuplicatesMerged = 0;
+                int localGeocodingFailedCount = 0;
+                try {
+                    logger.info("Running scraper: {}", sourceName);
+                    List<RawNews> rawNewsList = scraper.scrape(actualDays);
+                    extractedThisSource = rawNewsList.size();
 
-                LocalDateTime cutoff = LocalDateTime.now().minusDays(actualDays);
-                for (RawNews raw : rawNewsList) {
-                    try {
-                        if (!isWithinLastDays(raw, cutoff)) {
-                            logger.debug("Haber son {} gün dışında, atlanıyor: {}", actualDays, raw.getTitle());
-                            continue;
+                    LocalDateTime cutoff = LocalDateTime.now().minusDays(actualDays);
+                    for (RawNews raw : rawNewsList) {
+                        try {
+                            if (!isWithinLastDays(raw, cutoff)) {
+                                logger.debug("Haber son {} gün dışında, atlanıyor: {}", actualDays, raw.getTitle());
+                                continue;
+                            }
+                            PipelineResult result = processAndSavePipeline(raw);
+                            if (result.isGeocodingFailed()) {
+                                localGeocodingFailedCount++;
+                                logger.warn("Geocoding failed for news: {} from source: {}", raw.getTitle(), sourceName);
+                            } else if (result.isNew()) {
+                                localNewSaved++;
+                            } else {
+                                localDuplicatesMerged++;
+                            }
+                        } catch (Exception ex) {
+                            logger.error("Failed to process RawNews from {}: {}", sourceName, ex.getMessage(), ex);
                         }
-                        PipelineResult result = processAndSavePipeline(raw);
-                        if (result.isGeocodingFailed()) {
-                            geocodingFailedCount++;
-                            logger.warn("Geocoding failed for news: {} from source: {}", raw.getTitle(), sourceName);
-                        } else if (result.isNew()) {
-                            newSaved++;
-                        } else {
-                            duplicatesMerged++;
+                    }
+                    logger.info("Scraper '{}' finished. Extracted {} raw items.", sourceName, rawNewsList.size());
+                } catch (Exception e) {
+                    logger.error("Error occurred while scraping with {}: {}", sourceName, e.getMessage());
+                } finally {
+                    totalScraped.addAndGet(extractedThisSource);
+                    newSaved.addAndGet(localNewSaved);
+                    duplicatesMerged.addAndGet(localDuplicatesMerged);
+                    geocodingFailedCount.addAndGet(localGeocodingFailedCount);
+                    perSource.put(sourceName, extractedThisSource);
+                    
+                    if (progress != null) {
+                        synchronized (progress) {
+                            progress.accept(ScrapeProgressEventDto.sourceDone(sourceName, sourceIndex, totalSources, extractedThisSource));
                         }
-                    } catch (Exception ex) {
-                        logger.error("Failed to process RawNews from {}: {}", sourceName, ex.getMessage(), ex);
                     }
                 }
-                logger.info("Scraper '{}' finished. Extracted {} raw items.", sourceName, rawNewsList.size());
-            } catch (Exception e) {
-                logger.error("Error occurred while scraping with {}: {}", sourceName, e.getMessage());
-            }
-            perSource.put(sourceName, extractedThisSource);
-            if (progress != null) {
-                progress.accept(ScrapeProgressEventDto.sourceDone(sourceName, sourceIndex, totalSources, extractedThisSource));
-            }
+            }, executor);
+            futures.add(future);
         }
 
-        logger.info("Scraping finished. Total: {}, New: {}, Duplicates: {}, Geocoding Failed: {}", totalScraped, newSaved, duplicatesMerged, geocodingFailedCount);
+        java.util.concurrent.CompletableFuture.allOf(futures.toArray(new java.util.concurrent.CompletableFuture[0])).join();
+        executor.shutdown();
+
+        logger.info("Scraping finished. Total: {}, New: {}, Duplicates: {}, Geocoding Failed: {}", totalScraped.get(), newSaved.get(), duplicatesMerged.get(), geocodingFailedCount.get());
         ScrapeResultDto dto = new ScrapeResultDto();
-        dto.setTotalScraped(totalScraped);
-        dto.setNewSaved(newSaved);
-        dto.setDuplicatesMerged(duplicatesMerged);
-        dto.setGeocodingFailed(geocodingFailedCount);
+        dto.setTotalScraped(totalScraped.get());
+        dto.setNewSaved(newSaved.get());
+        dto.setDuplicatesMerged(duplicatesMerged.get());
+        dto.setGeocodingFailed(geocodingFailedCount.get());
         dto.setScrapedBySource(perSource);
+        
         if (progress != null) {
-            progress.accept(ScrapeProgressEventDto.complete(dto));
+            synchronized (progress) {
+                progress.accept(ScrapeProgressEventDto.complete(dto));
+            }
         }
         return dto;
     }
