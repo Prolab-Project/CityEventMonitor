@@ -33,11 +33,8 @@ public class YeniKocaeliScraper implements NewsScraper {
             Document doc = ScraperHttp.connect(BASE_URL).get();
 
             Elements links = doc.select("a[href*=\"/haber/\"]");
-            int maxLinks = scraperLimits.getMaxDetailPagesPerSource();
             int count = 0;
             for (Element link : links) {
-                if (count >= maxLinks) break;
-
                 RawNews raw = buildFromListLink(link);
                 if (raw == null) continue;
 

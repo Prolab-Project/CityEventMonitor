@@ -25,16 +25,16 @@ public class SemanticTypeValidator {
 
     static {
         REFERENCE_TEXTS.put(NewsType.TRAFIK_KAZASI, List.of(
-                "Trafik kazası meydana geldi araçlar çarpıştı",
-                "Yaralılar hastaneye kaldırıldı, kaza nedeniyle yol trafiğe kapandı",
-                "Otomobil refüje çarptı motosiklet devrildi",
-                "Kaza sonucu ambulans geldi sürücü hayatını kaybetti alkollü araç takla attı"
+                "Trafik kazası meydana geldi araçlar çarpıştı otomobil kamyon tırla çarpıştı",
+                "Kaza nedeniyle yol trafiğe kapandı sürücü yaralandı ambulans sevk edildi",
+                "Otomobil refüje çarptı motosiklet devrildi alkollü sürücü kaza yaptı",
+                "Araç takla attı sürücü hayatını kaybetti trafik polisi olay yerinde"
         ));
         REFERENCE_TEXTS.put(NewsType.YANGIN, List.of(
                 "Yangın çıktı itfaiye ekipleri müdahale etti alevler söndürüldü",
                 "Binada çıkan yangın büyük hasara yol açtı duman yükseldi kundaklama",
                 "Ev veya eşyalar alev aldı itfaiye saatlerce uğraştı panik yaşandı",
-                "Şofben alev aldı ev duman altında kaldı itfaiye ve ambulans sevk edildi"
+                "Şofben alev aldı ev duman altında kaldı itfaiye müdahale etti"
         ));
         REFERENCE_TEXTS.put(NewsType.ELEKTRIK_KESINTISI, List.of(
                 "Planlı elektrik kesintisi yapılacak saatlerce elektrik verilmeyecek SEDAŞ duyurdu",
@@ -49,7 +49,11 @@ public class SemanticTypeValidator {
         REFERENCE_TEXTS.put(NewsType.KULTUREL_ETKINLIK, List.of(
                 "Konser ve festival etkinliği düzenlendi ünlü sanatçılar sahne aldı tören",
                 "Futbol maçında takımlar karşılaştı transfer gerçekleşti imza töreni oyuncu",
-                "Tiyatro gösterisi sergi açıldı panel söyleşi kültür merkezi etkinlik"
+                "Tiyatro gösterisi sergi açıldı panel söyleşi kültür merkezi etkinlik",
+                "Farkındalık etkinliği düzenlendi seminer katılımcılara bilgi verildi",
+                "Eğitim programı gerçekleştirildi öğrenciler bilgilendirildi sempozyum",
+                "Deprem afet bilinçlendirme etkinliği bilgilendirme toplantısı yapıldı",
+                "Farkındalık günü kutlandı konferans workshop sivil toplum etkinliği"
         ));
     }
 
@@ -94,6 +98,29 @@ public class SemanticTypeValidator {
         log.info("[SemanticValidator] Toplam {} referans cümle analize hazır.", flatReferenceTexts.size());
     }
 
+    /**
+     * Keyword türünün semantik olarak "yeterli" sayılması için gereken minimum skor.
+     * Keyword türünün kendi referans cümleleriyle benzerliği bu eşiğin altındaysa
+     * keyword sınıflandırması reddedilir ve DIGER'e düşürülür.
+     */
+    @Value("${nlp.semantic-validation.confirm-threshold:0.30}")
+    private double confirmThreshold;
+
+    /**
+     * Semantik doğrulama: Keyword sınıflandırıcısının sonucunu anlamsal olarak kontrol eder.
+     *
+     * <p><b>TEMEL KURAL: Semantik validator ASLA bir spesifik türü başka bir spesifik türe çeviremez.</b></p>
+     *
+     * <p>Keyword sınıflandırıcısı kural tabanlıdır ve "hırsızlık", "yangın" gibi açık keyword
+     * eşleşmeleri yapar — bu, MiniLM'nin belirsiz benzerlik skorlarından çok daha güvenilirdir.</p>
+     *
+     * <p>Bu validator yalnızca iki şey yapabilir:</p>
+     * <ol>
+     *   <li><b>ONAYLA</b> — Keyword türünün semantik skoru yeterli → keyword korunur</li>
+     *   <li><b>DIGER'e düşür</b> — Keyword türünün kendi semantik skoru çok düşük →
+     *       keyword eşleşmesi yanlış pozitif olabilir, DIGER'e düşür</li>
+     * </ol>
+     */
     public NewsType validate(String title, String contentSnippet, NewsType keywordType) {
         if (keywordType == NewsType.DIGER) {
             return NewsType.DIGER;
@@ -106,40 +133,34 @@ public class SemanticTypeValidator {
         try {
             String validationText = buildValidationText(title, contentSnippet);
 
-            // Yeni yapı: Metin yollanır, HF tüm cümlelerle kıyaslayıp DİREKT benzerlik yüzdelerini döner.
             List<Double> scores = embeddingService.calculateSimilarities(validationText, flatReferenceTexts);
 
             if (scores == null || scores.isEmpty() || scores.size() != flatReferenceTexts.size()) {
-                return keywordType; // API hata verdiyse (ör. timeout) eski türe güven
+                return keywordType; // API hata verdiyse keyword'e güven
             }
 
-            NewsType bestType = null;
-            double maxSim = minSimilarityThreshold; // Eşiğin altında kalanlar baştan reddedilir
-
+            // Keyword türünün kendi referans cümleleriyle en yüksek benzerlik skorunu bul
+            double keywordBestScore = 0.0;
             for (int i = 0; i < scores.size(); i++) {
-                double sim = scores.get(i);
-                NewsType currentType = flatReferenceTypes.get(i);
-                
-                if (sim > maxSim) {
-                    maxSim = sim;
-                    bestType = currentType;
+                if (flatReferenceTypes.get(i) == keywordType) {
+                    keywordBestScore = Math.max(keywordBestScore, scores.get(i));
                 }
             }
 
-            if (bestType == null) {
-                log.info("[SemanticValidator] Tür REDDEDİLDİ ⬇️ (Zayıf Anlam) → Keyword: {} | Yeni Çıktı: DIGER | Metin: \"{}\"",
-                        keywordType, validationText);
-                return NewsType.DIGER;
+            // Keyword türünün kendi skoru yeterli mi?
+            if (keywordBestScore >= confirmThreshold) {
+                log.debug("[SemanticValidator] ONAYLANDI ✅ → {} (skor: {})",
+                        keywordType, String.format("%.3f", keywordBestScore));
+                return keywordType;
             }
 
-            if (bestType == keywordType) {
-                log.debug("[SemanticValidator] ONAYLANDI ✅ → {}", keywordType);
-                return keywordType;
-            } else {
-                log.info("[SemanticValidator] Tür DEĞİŞTİRİLDİ 🔄 → Keyword: {} | Yeni Çıktı: {} | Metin: \"{}\"",
-                        keywordType, bestType, validationText);
-                return bestType;
-            }
+            // Keyword türü semantik olarak zayıf — yanlış pozitif olabilir, DIGER'e düşür
+            log.info("[SemanticValidator] Tür REDDEDİLDİ ⬇️ → Keyword: {} | Skor: {} < Eşik: {} | Metin: \"{}\"",
+                    keywordType,
+                    String.format("%.3f", keywordBestScore),
+                    String.format("%.2f", confirmThreshold),
+                    validationText);
+            return NewsType.DIGER;
 
         } catch (Exception e) {
             log.warn("[SemanticValidator] Doğrulama hatası, keyword türü korunuyor: {}", e.getMessage());
