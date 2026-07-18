@@ -95,3 +95,10 @@ Arayüz: `http://localhost:5173` (veya Vite’ın gösterdiği adres)
 | Frontend Harita   | `.env` / `.env.local`           | `VITE_GOOGLE_MAPS_API_KEY`          |
 
 Bu anahtarlar ayarlanmadan Geocoding ve harita özellikleri çalışmaz.
+
+## Örnek Görüntüler
+
+<img width="1329" height="691" alt="image" src="https://github.com/user-attachments/assets/aac57033-834b-454b-bb42-5d8d0dcaa0f3" />
+<img width="1333" height="693" alt="image" src="https://github.com/user-attachments/assets/bb28af5a-30e8-4c37-a477-43e8fb3690ad" />
+
+
